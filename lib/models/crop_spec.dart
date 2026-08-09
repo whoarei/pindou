@@ -18,6 +18,24 @@ class CropSpec {
 
   static const full = CropSpec();
 
+  factory CropSpec.fromJson(Map<String, dynamic> json) {
+    return CropSpec(
+      left: (json['left'] as num).toDouble(),
+      top: (json['top'] as num).toDouble(),
+      width: (json['width'] as num).toDouble(),
+      height: (json['height'] as num).toDouble(),
+      quarterTurns: (json['quarterTurns'] as num).toInt(),
+    );
+  }
+
+  Map<String, Object> toJson() => <String, Object>{
+    'left': left,
+    'top': top,
+    'width': width,
+    'height': height,
+    'quarterTurns': quarterTurns,
+  };
+
   CropSpec copyWith({
     double? left,
     double? top,

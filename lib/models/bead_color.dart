@@ -21,6 +21,12 @@ class BeadColor {
     );
   }
 
+  Map<String, Object> toJson() => <String, Object>{
+    'code': code,
+    'name': name,
+    'rgb': <int>[red, green, blue],
+  };
+
   final String code;
   final String name;
   final int red;
@@ -28,6 +34,20 @@ class BeadColor {
   final int blue;
 
   Color get color => Color.fromARGB(255, red, green, blue);
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is BeadColor &&
+            other.code == code &&
+            other.name == name &&
+            other.red == red &&
+            other.green == green &&
+            other.blue == blue;
+  }
+
+  @override
+  int get hashCode => Object.hash(code, name, red, green, blue);
 }
 
 @immutable

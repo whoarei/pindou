@@ -15,11 +15,16 @@ class MainActivity : FlutterActivity() {
         private const val FILES_CHANNEL = "top.mossmoss.pindoustudio/files"
         private const val PICK_IMAGE_REQUEST = 9020
         private const val CREATE_JPEG_REQUEST = 9021
+        private const val PICK_PROJECT_REQUEST = 9022
+        private const val CREATE_PROJECT_REQUEST = 9023
     }
 
     private var pendingBytes: ByteArray? = null
     private var pendingExportResult: MethodChannel.Result? = null
     private var pendingPickResult: MethodChannel.Result? = null
+    private var pendingProjectBytes: ByteArray? = null
+    private var pendingProjectSaveResult: MethodChannel.Result? = null
+    private var pendingProjectPickResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -54,6 +59,45 @@ class MainActivity : FlutterActivity() {
                         }
                         startActivityForResult(intent, CREATE_JPEG_REQUEST)
                     }
+                    "pickProject" -> {
+                        if (pendingProjectPickResult != null) {
+                            result.error("PROJECT_PICK_BUSY", "另一个工程选择操作正在进行。", null)
+                            return@setMethodCallHandler
+                        }
+                        pendingProjectPickResult = result
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        try {
+                            startActivityForResult(intent, PICK_PROJECT_REQUEST)
+                        } catch (error: ActivityNotFoundException) {
+                            pendingProjectPickResult = null
+                            result.error("PROJECT_PICK_UNAVAILABLE", "设备上没有可用的文件选择器。", error.message)
+                        }
+                    }
+                    "saveProject" -> {
+                        if (pendingProjectSaveResult != null) {
+                            result.error("PROJECT_SAVE_BUSY", "另一个工程保存操作正在进行。", null)
+                            return@setMethodCallHandler
+                        }
+                        val bytes = call.argument<ByteArray>("bytes")
+                        val fileName = call.argument<String>("fileName") ?: "project.pindou"
+                        if (bytes == null) {
+                            result.error("INVALID_PROJECT_DATA", "没有可保存的工程数据。", null)
+                            return@setMethodCallHandler
+                        }
+                        pendingProjectBytes = bytes
+                        pendingProjectSaveResult = result
+                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "application/json"
+                            putExtra(Intent.EXTRA_TITLE, fileName)
+                        }
+                        startActivityForResult(intent, CREATE_PROJECT_REQUEST)
+                    }
+                    "getAppDataPath" -> result.success(filesDir.absolutePath)
                     else -> result.notImplemented()
                 }
             }
@@ -116,6 +160,57 @@ class MainActivity : FlutterActivity() {
                 result?.success(mapOf("bytes" to bytes, "name" to name))
             } catch (error: Exception) {
                 result?.error("PICK_FAILED", error.message, null)
+            }
+            return
+        }
+        if (requestCode == PICK_PROJECT_REQUEST) {
+            val result = pendingProjectPickResult
+            pendingProjectPickResult = null
+            if (resultCode != Activity.RESULT_OK || data?.data == null) {
+                result?.success(null)
+                return
+            }
+            try {
+                val uri = data.data!!
+                val bytes = contentResolver.openInputStream(uri).use { input ->
+                    requireNotNull(input) { "无法读取所选工程文件。" }
+                    input.readBytes()
+                }
+                var name = "project.pindou"
+                contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (index >= 0) name = cursor.getString(index)
+                    }
+                }
+                result?.success(mapOf("bytes" to bytes, "name" to name))
+            } catch (error: Exception) {
+                result?.error("PROJECT_PICK_FAILED", error.message, null)
+            }
+            return
+        }
+        if (requestCode == CREATE_PROJECT_REQUEST) {
+            val result = pendingProjectSaveResult
+            val bytes = pendingProjectBytes
+            pendingProjectSaveResult = null
+            pendingProjectBytes = null
+            if (resultCode != Activity.RESULT_OK || data?.data == null) {
+                result?.success(null)
+                return
+            }
+            if (bytes == null) {
+                result?.error("PROJECT_SAVE_FAILED", "工程数据已丢失。", null)
+                return
+            }
+            try {
+                val uri = data.data!!
+                contentResolver.openOutputStream(uri, "w").use { output ->
+                    requireNotNull(output) { "无法打开目标文件。" }
+                    output.write(bytes)
+                }
+                result?.success(uri.toString())
+            } catch (error: Exception) {
+                result?.error("PROJECT_SAVE_FAILED", error.message, null)
             }
             return
         }

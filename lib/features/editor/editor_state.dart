@@ -20,11 +20,15 @@ class EditorState {
     this.maximumColors = 16,
     this.dither = false,
     this.showGrid = true,
+    this.showColorCodes = true,
+    this.isColorEditing = false,
+    this.selectedCells = const <int>{},
     this.pattern,
     this.isLoadingPalettes = true,
     this.isProcessing = false,
     this.isExporting = false,
     this.errorMessage,
+    this.noticeMessage,
     this.lastExportPath,
   });
 
@@ -41,11 +45,15 @@ class EditorState {
   final int maximumColors;
   final bool dither;
   final bool showGrid;
+  final bool showColorCodes;
+  final bool isColorEditing;
+  final Set<int> selectedCells;
   final Pattern? pattern;
   final bool isLoadingPalettes;
   final bool isProcessing;
   final bool isExporting;
   final String? errorMessage;
+  final String? noticeMessage;
   final String? lastExportPath;
 
   BeadPalette? get selectedPalette {
@@ -80,6 +88,10 @@ class EditorState {
     int? maximumColors,
     bool? dither,
     bool? showGrid,
+    bool? showColorCodes,
+    bool? isColorEditing,
+    Set<int>? selectedCells,
+    bool clearSelection = false,
     Pattern? pattern,
     bool clearPattern = false,
     bool? isLoadingPalettes,
@@ -87,6 +99,8 @@ class EditorState {
     bool? isExporting,
     String? errorMessage,
     bool clearError = false,
+    String? noticeMessage,
+    bool clearNotice = false,
     String? lastExportPath,
   }) {
     return EditorState(
@@ -103,11 +117,21 @@ class EditorState {
       maximumColors: maximumColors ?? this.maximumColors,
       dither: dither ?? this.dither,
       showGrid: showGrid ?? this.showGrid,
+      showColorCodes: showColorCodes ?? this.showColorCodes,
+      isColorEditing: clearPattern
+          ? false
+          : (isColorEditing ?? this.isColorEditing),
+      selectedCells: Set<int>.unmodifiable(
+        clearPattern || clearSelection
+            ? const <int>{}
+            : (selectedCells ?? this.selectedCells),
+      ),
       pattern: clearPattern ? null : (pattern ?? this.pattern),
       isLoadingPalettes: isLoadingPalettes ?? this.isLoadingPalettes,
       isProcessing: isProcessing ?? this.isProcessing,
       isExporting: isExporting ?? this.isExporting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      noticeMessage: clearNotice ? null : (noticeMessage ?? this.noticeMessage),
       lastExportPath: lastExportPath ?? this.lastExportPath,
     );
   }

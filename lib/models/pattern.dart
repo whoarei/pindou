@@ -28,6 +28,49 @@ class Pattern {
     values.sort((a, b) => b.count.compareTo(a.count));
     return values;
   }
+
+  Pattern replaceCells(Iterable<int> cells, BeadColor replacement) {
+    final selected = cells
+        .where((index) => index >= 0 && index < colorIndices.length)
+        .toSet();
+    if (selected.isEmpty) return this;
+
+    final expandedColors = List<BeadColor>.of(colors);
+    var replacementIndex = expandedColors.indexWhere(
+      (color) => color.code == replacement.code,
+    );
+    if (replacementIndex < 0) {
+      replacementIndex = expandedColors.length;
+      expandedColors.add(replacement);
+    }
+
+    final expandedIndices = List<int>.of(colorIndices);
+    for (final cell in selected) {
+      expandedIndices[cell] = replacementIndex;
+    }
+
+    final expandedCounts = List<int>.filled(expandedColors.length, 0);
+    for (final index in expandedIndices) {
+      expandedCounts[index]++;
+    }
+    final remap = List<int>.filled(expandedColors.length, -1);
+    final compactColors = <BeadColor>[];
+    final compactCounts = <int>[];
+    for (var i = 0; i < expandedColors.length; i++) {
+      if (expandedCounts[i] == 0) continue;
+      remap[i] = compactColors.length;
+      compactColors.add(expandedColors[i]);
+      compactCounts.add(expandedCounts[i]);
+    }
+
+    return Pattern(
+      width: width,
+      height: height,
+      colorIndices: [for (final index in expandedIndices) remap[index]],
+      colors: List.unmodifiable(compactColors),
+      counts: List.unmodifiable(compactCounts),
+    );
+  }
 }
 
 @immutable

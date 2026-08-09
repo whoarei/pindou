@@ -31,6 +31,13 @@ struct FileDialogCompletion {
   FileDialogOutcome outcome;
 };
 
+enum class FileDialogKind {
+  kOpenImage,
+  kSaveJpeg,
+  kOpenProject,
+  kSaveProject,
+};
+
 std::wstring Utf16FromUtf8(const std::string& value) {
   if (value.empty()) {
     return std::wstring();
@@ -50,7 +57,7 @@ std::wstring Utf16FromUtf8(const std::string& value) {
   return output;
 }
 
-FileDialogOutcome ShowFileDialog(HWND owner, bool save,
+FileDialogOutcome ShowFileDialog(HWND owner, FileDialogKind kind,
                                  const std::wstring& suggested_name) {
   std::array<wchar_t, 32768> path_buffer{};
   if (!suggested_name.empty()) {
@@ -63,19 +70,32 @@ FileDialogOutcome ShowFileDialog(HWND owner, bool save,
       L"All files (*.*)\0*.*\0";
   constexpr wchar_t kJpegFilter[] =
       L"JPEG image (*.jpg)\0*.jpg\0All files (*.*)\0*.*\0";
+  constexpr wchar_t kProjectFilter[] =
+      L"Pindou Studio project (*.pindou)\0*.pindou\0"
+      L"All files (*.*)\0*.*\0";
+
+  const bool save = kind == FileDialogKind::kSaveJpeg ||
+                    kind == FileDialogKind::kSaveProject;
+  const bool project = kind == FileDialogKind::kOpenProject ||
+                       kind == FileDialogKind::kSaveProject;
 
   OPENFILENAMEW dialog{};
   dialog.lStructSize = sizeof(dialog);
   dialog.hwndOwner = owner;
   dialog.lpstrFile = path_buffer.data();
   dialog.nMaxFile = static_cast<DWORD>(path_buffer.size());
-  dialog.lpstrFilter = save ? kJpegFilter : kImageFilter;
+  dialog.lpstrFilter = project ? kProjectFilter
+                               : (save ? kJpegFilter : kImageFilter);
   dialog.nFilterIndex = 1;
-  dialog.lpstrTitle = save ? L"Export bead pattern" : L"Select JPG or PNG";
+  dialog.lpstrTitle = project
+                          ? (save ? L"Save Pindou Studio project"
+                                  : L"Open Pindou Studio project")
+                          : (save ? L"Export bead pattern"
+                                  : L"Select JPG or PNG");
   dialog.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
   if (save) {
     dialog.Flags |= OFN_OVERWRITEPROMPT;
-    dialog.lpstrDefExt = L"jpg";
+    dialog.lpstrDefExt = project ? L"pindou" : L"jpg";
   } else {
     dialog.Flags |= OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
   }
@@ -117,9 +137,12 @@ bool FlutterWindow::OnCreate() {
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
              std::unique_ptr<
                  flutter::MethodResult<flutter::EncodableValue>> result) {
-        const bool is_open = call.method_name() == "pickImage";
-        const bool is_save = call.method_name() == "pickJpegSavePath";
-        if (!is_open && !is_save) {
+        const bool opens_image = call.method_name() == "pickImage";
+        const bool saves_jpeg = call.method_name() == "pickJpegSavePath";
+        const bool opens_project = call.method_name() == "pickProject";
+        const bool saves_project =
+            call.method_name() == "pickProjectSavePath";
+        if (!opens_image && !saves_jpeg && !opens_project && !saves_project) {
           result->NotImplemented();
           return;
         }
@@ -129,7 +152,8 @@ bool FlutterWindow::OnCreate() {
         }
 
         std::wstring suggested_name;
-        if (is_save && call.arguments() != nullptr) {
+        const bool saves_file = saves_jpeg || saves_project;
+        if (saves_file && call.arguments() != nullptr) {
           const auto* arguments =
               std::get_if<flutter::EncodableMap>(call.arguments());
           if (arguments != nullptr) {
@@ -144,14 +168,20 @@ bool FlutterWindow::OnCreate() {
           }
         }
 
+        const FileDialogKind kind =
+            opens_image   ? FileDialogKind::kOpenImage
+            : saves_jpeg  ? FileDialogKind::kSaveJpeg
+            : opens_project ? FileDialogKind::kOpenProject
+                            : FileDialogKind::kSaveProject;
+
         file_dialog_open_ = true;
         const HWND owner = GetHandle();
         auto* raw_result = result.release();
-        std::thread([owner, raw_result, is_save,
+        std::thread([owner, raw_result, kind,
                      suggested_name = std::move(suggested_name)]() mutable {
           auto completion = std::make_unique<FileDialogCompletion>();
           completion->result.reset(raw_result);
-          completion->outcome = ShowFileDialog(owner, is_save, suggested_name);
+          completion->outcome = ShowFileDialog(owner, kind, suggested_name);
           if (!IsWindow(owner) ||
               !PostMessage(owner, kFileDialogCompleteMessage, 0,
                            reinterpret_cast<LPARAM>(completion.get()))) {

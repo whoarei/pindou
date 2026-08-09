@@ -90,10 +90,84 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('selects cells and replaces them from the brand palette', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const red = BeadColor(
+      code: 'P01',
+      name: 'Red',
+      red: 225,
+      green: 35,
+      blue: 45,
+    );
+    const blue = BeadColor(
+      code: 'P02',
+      name: 'Blue',
+      red: 30,
+      green: 55,
+      blue: 220,
+    );
+    final controller = _PresetEditorController(
+      const EditorState(
+        palettes: [
+          BeadPalette(brand: 'Test', colors: [red, blue]),
+        ],
+        selectedBrand: 'Test',
+        pattern: Pattern(
+          width: 2,
+          height: 2,
+          colorIndices: [0, 0, 0, 0],
+          colors: [red],
+          counts: [4],
+        ),
+        isLoadingPalettes: false,
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [editorProvider.overrideWith((ref) => controller)],
+        child: const BeadPatternApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('toggle-color-codes')));
+    await tester.pump();
+    expect(controller.state.showColorCodes, isFalse);
+
+    await tester.tap(find.byKey(const ValueKey('toggle-color-editing')));
+    await tester.pump();
+    expect(controller.state.isColorEditing, isTrue);
+
+    controller.toggleSelectedCell(0);
+    controller.toggleSelectedCell(1);
+    await tester.pump();
+    expect(find.text('已选 2 个色块'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('replace-selected-color')));
+    await tester.pumpAndSettle();
+    expect(find.text('选择 Test 色号'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('palette-color-P02')));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.pattern!.counts, [2, 2]);
+    expect(controller.state.pattern!.colors, [red, blue]);
+    expect(controller.state.selectedCells, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _PresetEditorController extends EditorController {
-  _PresetEditorController(EditorState initial) : super(const PaletteService()) {
+  _PresetEditorController(EditorState initial)
+    : super(const PaletteService(), autosaveEnabled: false) {
     state = initial;
   }
 }

@@ -199,9 +199,21 @@ void _matchWithDithering({
   }
 }
 
-Uint8List renderPatternJpeg(Pattern pattern, {required bool showGrid}) {
+Uint8List renderPatternJpeg(
+  Pattern pattern, {
+  required bool showGrid,
+  required bool showColorCodes,
+}) {
   final longestSide = math.max(pattern.width, pattern.height);
-  final cellSize = (3600 / longestSide).floor().clamp(4, 48);
+  final regularCellSize = (3600 / longestSide).floor().clamp(4, 48);
+  final longestCode = pattern.colors.fold<int>(
+    1,
+    (length, color) => math.max(length, color.code.length),
+  );
+  final codeCellSize = (longestCode * 4 + 2).clamp(18, 30);
+  final cellSize = showColorCodes
+      ? math.max(regularCellSize, codeCellSize)
+      : regularCellSize;
   const outerBorder = 2;
   final output = img.Image(
     width: pattern.width * cellSize + outerBorder * 2,
@@ -244,6 +256,16 @@ Uint8List renderPatternJpeg(Pattern pattern, {required bool showGrid}) {
           color: gridColor,
         );
       }
+      if (showColorCodes) {
+        _drawTinyCode(
+          output,
+          code: color.code,
+          startX: startX,
+          startY: startY,
+          cellSize: cellSize,
+          foreground: _codeForeground(color),
+        );
+      }
     }
   }
   if (showGrid) {
@@ -259,3 +281,96 @@ Uint8List renderPatternJpeg(Pattern pattern, {required bool showGrid}) {
   }
   return img.JpegEncoder(quality: 94).encode(output);
 }
+
+img.ColorRgb8 _codeForeground(BeadColor color) {
+  final luminance =
+      color.red * 0.299 + color.green * 0.587 + color.blue * 0.114;
+  return luminance >= 150
+      ? img.ColorRgb8(24, 26, 28)
+      : img.ColorRgb8(250, 250, 248);
+}
+
+void _drawTinyCode(
+  img.Image image, {
+  required String code,
+  required int startX,
+  required int startY,
+  required int cellSize,
+  required img.ColorRgb8 foreground,
+}) {
+  final glyphs = <List<int>>[
+    for (final unit in code.toUpperCase().codeUnits)
+      _tinyGlyphs[unit] ?? _unknownTinyGlyph,
+  ];
+  if (glyphs.isEmpty) return;
+  final unitsWide = glyphs.length * 4 - 1;
+  final scale = math.max(
+    1,
+    math.min((cellSize - 2) ~/ unitsWide, (cellSize - 2) ~/ 5),
+  );
+  final pixelWidth = unitsWide * scale;
+  final pixelHeight = 5 * scale;
+  final originX = startX + (cellSize - pixelWidth) ~/ 2;
+  final originY = startY + (cellSize - pixelHeight) ~/ 2;
+
+  for (var glyphIndex = 0; glyphIndex < glyphs.length; glyphIndex++) {
+    final glyph = glyphs[glyphIndex];
+    for (var row = 0; row < glyph.length; row++) {
+      for (var column = 0; column < 3; column++) {
+        if (glyph[row] & (1 << (2 - column)) == 0) continue;
+        final x = originX + (glyphIndex * 4 + column) * scale;
+        final y = originY + row * scale;
+        img.fillRect(
+          image,
+          x1: x,
+          y1: y,
+          x2: x + scale - 1,
+          y2: y + scale - 1,
+          color: foreground,
+        );
+      }
+    }
+  }
+}
+
+const _unknownTinyGlyph = <int>[0x7, 0x1, 0x2, 0x0, 0x2];
+
+const _tinyGlyphs = <int, List<int>>{
+  0x30: <int>[0x7, 0x5, 0x5, 0x5, 0x7],
+  0x31: <int>[0x2, 0x6, 0x2, 0x2, 0x7],
+  0x32: <int>[0x7, 0x1, 0x7, 0x4, 0x7],
+  0x33: <int>[0x7, 0x1, 0x7, 0x1, 0x7],
+  0x34: <int>[0x5, 0x5, 0x7, 0x1, 0x1],
+  0x35: <int>[0x7, 0x4, 0x7, 0x1, 0x7],
+  0x36: <int>[0x7, 0x4, 0x7, 0x5, 0x7],
+  0x37: <int>[0x7, 0x1, 0x1, 0x2, 0x2],
+  0x38: <int>[0x7, 0x5, 0x7, 0x5, 0x7],
+  0x39: <int>[0x7, 0x5, 0x7, 0x1, 0x7],
+  0x41: <int>[0x2, 0x5, 0x7, 0x5, 0x5],
+  0x42: <int>[0x6, 0x5, 0x6, 0x5, 0x6],
+  0x43: <int>[0x3, 0x4, 0x4, 0x4, 0x3],
+  0x44: <int>[0x6, 0x5, 0x5, 0x5, 0x6],
+  0x45: <int>[0x7, 0x4, 0x6, 0x4, 0x7],
+  0x46: <int>[0x7, 0x4, 0x6, 0x4, 0x4],
+  0x47: <int>[0x3, 0x4, 0x5, 0x5, 0x3],
+  0x48: <int>[0x5, 0x5, 0x7, 0x5, 0x5],
+  0x49: <int>[0x7, 0x2, 0x2, 0x2, 0x7],
+  0x4a: <int>[0x1, 0x1, 0x1, 0x5, 0x2],
+  0x4b: <int>[0x5, 0x5, 0x6, 0x5, 0x5],
+  0x4c: <int>[0x4, 0x4, 0x4, 0x4, 0x7],
+  0x4d: <int>[0x5, 0x7, 0x7, 0x5, 0x5],
+  0x4e: <int>[0x5, 0x7, 0x7, 0x7, 0x5],
+  0x4f: <int>[0x2, 0x5, 0x5, 0x5, 0x2],
+  0x50: <int>[0x6, 0x5, 0x6, 0x4, 0x4],
+  0x51: <int>[0x2, 0x5, 0x5, 0x7, 0x3],
+  0x52: <int>[0x6, 0x5, 0x6, 0x5, 0x5],
+  0x53: <int>[0x3, 0x4, 0x2, 0x1, 0x6],
+  0x54: <int>[0x7, 0x2, 0x2, 0x2, 0x2],
+  0x55: <int>[0x5, 0x5, 0x5, 0x5, 0x7],
+  0x56: <int>[0x5, 0x5, 0x5, 0x5, 0x2],
+  0x57: <int>[0x5, 0x5, 0x7, 0x7, 0x5],
+  0x58: <int>[0x5, 0x5, 0x2, 0x5, 0x5],
+  0x59: <int>[0x5, 0x5, 0x2, 0x2, 0x2],
+  0x5a: <int>[0x7, 0x1, 0x2, 0x4, 0x7],
+  0x2d: <int>[0x0, 0x0, 0x7, 0x0, 0x0],
+};

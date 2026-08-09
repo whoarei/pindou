@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/bead_color.dart';
 import '../../models/pattern.dart';
 import 'crop_editor_dialog.dart';
 import 'editor_controller.dart';
@@ -32,6 +33,26 @@ class EditorScreen extends ConsumerWidget {
             ),
           ),
         );
+    });
+    ref.listen<String?>(editorProvider.select((value) => value.noticeMessage), (
+      previous,
+      next,
+    ) {
+      if (next == null || next == previous) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_outline_rounded),
+                const SizedBox(width: 10),
+                Expanded(child: Text(next)),
+              ],
+            ),
+          ),
+        );
+      controller.clearNotice();
     });
 
     return Scaffold(
@@ -78,6 +99,39 @@ class EditorScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          PopupMenuButton<_ProjectAction>(
+            tooltip: '工程文件',
+            icon: const Icon(Icons.folder_copy_outlined),
+            onSelected: (action) {
+              switch (action) {
+                case _ProjectAction.open:
+                  controller.openProject();
+                case _ProjectAction.save:
+                  controller.saveProject();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: _ProjectAction.open,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.folder_open_rounded),
+                  title: Text('打开工程'),
+                  subtitle: Text('恢复 .pindou 文件'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ProjectAction.save,
+                enabled: state.sourceBytes != null || state.pattern != null,
+                child: const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.save_outlined),
+                  title: Text('保存工程'),
+                  subtitle: Text('保存当前编辑状态'),
+                ),
+              ),
+            ],
+          ),
           if (state.pattern != null)
             Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -596,6 +650,14 @@ class _ParametersCard extends StatelessWidget {
               value: state.showGrid,
               onChanged: controller.setShowGrid,
             ),
+            const SizedBox(height: 4),
+            _ToggleRow(
+              icon: Icons.numbers_rounded,
+              title: '显示色号',
+              subtitle: '预览与导出的 JPG 包含每颗拼豆色号',
+              value: state.showColorCodes,
+              onChanged: controller.setShowColorCodes,
+            ),
             const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
@@ -641,32 +703,58 @@ class _WorkspaceCard extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 14, 12, 12),
-            child: Row(
-              children: [
-                const _SectionTitle(
-                  index: '03',
-                  title: '图案预览',
-                  icon: Icons.grid_4x4_rounded,
-                ),
-                const Spacer(),
-                if (panelControls != null) ...[
-                  panelControls!,
-                  const SizedBox(width: 7),
-                ],
-                if (pattern != null) ...[
-                  _StatusPill(
-                    icon: Icons.apps_rounded,
-                    label: '${pattern.width} × ${pattern.height}',
-                  ),
-                  if (panelControls == null) ...[
-                    const SizedBox(width: 7),
-                    _StatusPill(
-                      icon: Icons.circle,
-                      label: '${pattern.colors.length} 色',
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 560;
+                return Row(
+                  children: [
+                    const _SectionTitle(
+                      index: '03',
+                      title: '图案预览',
+                      icon: Icons.grid_4x4_rounded,
                     ),
+                    const Spacer(),
+                    if (panelControls != null) ...[
+                      panelControls!,
+                      const SizedBox(width: 5),
+                    ],
+                    if (pattern != null) ...[
+                      IconButton(
+                        key: const ValueKey('toggle-color-codes'),
+                        tooltip: state.showColorCodes ? '隐藏色号图层' : '显示色号图层',
+                        isSelected: state.showColorCodes,
+                        onPressed: () =>
+                            controller.setShowColorCodes(!state.showColorCodes),
+                        icon: const Icon(Icons.numbers_outlined),
+                        selectedIcon: const Icon(Icons.numbers_rounded),
+                      ),
+                      IconButton(
+                        key: const ValueKey('toggle-color-editing'),
+                        tooltip: state.isColorEditing ? '结束色号编辑' : '编辑色号',
+                        isSelected: state.isColorEditing,
+                        onPressed: () =>
+                            controller.setColorEditing(!state.isColorEditing),
+                        icon: const Icon(Icons.colorize_outlined),
+                        selectedIcon: const Icon(Icons.colorize_rounded),
+                      ),
+                      if (!compact) ...[
+                        const SizedBox(width: 5),
+                        _StatusPill(
+                          icon: Icons.apps_rounded,
+                          label: '${pattern.width} × ${pattern.height}',
+                        ),
+                        if (panelControls == null) ...[
+                          const SizedBox(width: 7),
+                          _StatusPill(
+                            icon: Icons.circle,
+                            label: '${pattern.colors.length} 色',
+                          ),
+                        ],
+                      ],
+                    ],
                   ],
-                ],
-              ],
+                );
+              },
             ),
           ),
           Divider(
@@ -695,8 +783,8 @@ class _WorkspaceCard extends StatelessWidget {
     if (state.pattern != null) {
       return _PatternView(
         key: const ValueKey('pattern'),
-        pattern: state.pattern!,
-        showGrid: state.showGrid,
+        state: state,
+        controller: controller,
       );
     }
     if (state.sourceBytes != null) {
@@ -710,18 +798,49 @@ class _WorkspaceCard extends StatelessWidget {
   }
 }
 
-class _PatternView extends StatelessWidget {
+class _PatternView extends StatefulWidget {
   const _PatternView({
-    required this.pattern,
-    required this.showGrid,
+    required this.state,
+    required this.controller,
     super.key,
   });
 
-  final Pattern pattern;
-  final bool showGrid;
+  final EditorState state;
+  final EditorController controller;
+
+  @override
+  State<_PatternView> createState() => _PatternViewState();
+}
+
+class _PatternViewState extends State<_PatternView> {
+  late final TransformationController _transformationController;
+  double _viewScale = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _transformationController = TransformationController()
+      ..addListener(_handleTransformation);
+  }
+
+  void _handleTransformation() {
+    final nextScale = _transformationController.value.getMaxScaleOnAxis();
+    if ((nextScale - _viewScale).abs() < 0.02 || !mounted) return;
+    setState(() => _viewScale = nextScale);
+  }
+
+  @override
+  void dispose() {
+    _transformationController
+      ..removeListener(_handleTransformation)
+      ..dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final state = widget.state;
+    final pattern = state.pattern!;
     return Stack(
       children: [
         Positioned.fill(
@@ -737,6 +856,7 @@ class _PatternView extends StatelessWidget {
                   width = height * aspect;
                 }
                 return InteractiveViewer(
+                  transformationController: _transformationController,
                   minScale: 0.75,
                   maxScale: 12,
                   boundaryMargin: const EdgeInsets.all(80),
@@ -754,10 +874,26 @@ class _PatternView extends StatelessWidget {
                       child: SizedBox(
                         width: width,
                         height: height,
-                        child: CustomPaint(
-                          painter: PatternPainter(
-                            pattern: pattern,
-                            showGrid: showGrid,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapUp: state.isColorEditing
+                              ? (details) => _toggleCell(
+                                  details.localPosition,
+                                  Size(width, height),
+                                  pattern,
+                                )
+                              : null,
+                          child: CustomPaint(
+                            painter: PatternPainter(
+                              pattern: pattern,
+                              showGrid: state.showGrid,
+                              showColorCodes: state.showColorCodes,
+                              selectedCells: state.selectedCells,
+                              viewScale: _viewScale,
+                              selectionColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                            ),
                           ),
                         ),
                       ),
@@ -768,6 +904,21 @@ class _PatternView extends StatelessWidget {
             ),
           ),
         ),
+        if (state.isColorEditing)
+          Positioned(
+            left: 12,
+            top: 12,
+            right: 12,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: _SelectionToolbar(
+                selectedCount: state.selectedCells.length,
+                onSelectMatching: widget.controller.selectMatchingColor,
+                onClear: widget.controller.clearSelectedCells,
+                onReplace: _showColorPicker,
+              ),
+            ),
+          ),
         Positioned(
           right: 12,
           bottom: 12,
@@ -793,6 +944,224 @@ class _PatternView extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  void _toggleCell(Offset position, Size size, Pattern pattern) {
+    final x = (position.dx / size.width * pattern.width).floor();
+    final y = (position.dy / size.height * pattern.height).floor();
+    if (x < 0 || x >= pattern.width || y < 0 || y >= pattern.height) return;
+    widget.controller.toggleSelectedCell(y * pattern.width + x);
+  }
+
+  Future<void> _showColorPicker() async {
+    if (widget.state.selectedCells.isEmpty) return;
+    final palette = widget.state.selectedPalette;
+    if (palette == null) return;
+    final selected = await showDialog<BeadColor>(
+      context: context,
+      builder: (context) => _ColorPickerDialog(palette: palette),
+    );
+    if (selected != null) widget.controller.replaceSelectedColor(selected);
+  }
+}
+
+class _SelectionToolbar extends StatelessWidget {
+  const _SelectionToolbar({
+    required this.selectedCount,
+    required this.onSelectMatching,
+    required this.onClear,
+    required this.onReplace,
+  });
+
+  final int selectedCount;
+  final VoidCallback onSelectMatching;
+  final VoidCallback onClear;
+  final VoidCallback onReplace;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.96),
+      elevation: 4,
+      shadowColor: Colors.black.withValues(alpha: 0.24),
+      borderRadius: BorderRadius.circular(14),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 580),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Icon(
+                Icons.touch_app_rounded,
+                size: 19,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              Text(
+                selectedCount == 0 ? '点击色块进行多选' : '已选 $selectedCount 个色块',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              if (selectedCount > 0) ...[
+                TextButton.icon(
+                  key: const ValueKey('select-matching-color'),
+                  onPressed: onSelectMatching,
+                  icon: const Icon(Icons.select_all_rounded, size: 18),
+                  label: const Text('选择同色'),
+                ),
+                FilledButton.tonalIcon(
+                  key: const ValueKey('replace-selected-color'),
+                  onPressed: onReplace,
+                  icon: const Icon(Icons.palette_outlined, size: 18),
+                  label: const Text('更改色号'),
+                ),
+                IconButton(
+                  tooltip: '清除选择',
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorPickerDialog extends StatefulWidget {
+  const _ColorPickerDialog({required this.palette});
+
+  final BeadPalette palette;
+
+  @override
+  State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
+}
+
+class _ColorPickerDialogState extends State<_ColorPickerDialog> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _query.trim().toLowerCase();
+    final colors = query.isEmpty
+        ? widget.palette.colors
+        : widget.palette.colors
+              .where(
+                (color) =>
+                    color.code.toLowerCase().contains(query) ||
+                    color.name.toLowerCase().contains(query),
+              )
+              .toList(growable: false);
+    final mediaSize = MediaQuery.sizeOf(context);
+    return AlertDialog(
+      title: Text('选择 ${widget.palette.brand} 色号'),
+      content: SizedBox(
+        width: math.min(720, mediaSize.width - 64),
+        height: math.min(570, mediaSize.height * 0.68),
+        child: Column(
+          children: [
+            TextField(
+              autofocus: true,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search_rounded),
+                hintText: '搜索色号或颜色名称',
+              ),
+              onChanged: (value) => setState(() => _query = value),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: colors.isEmpty
+                  ? const Center(child: Text('没有匹配的色号'))
+                  : GridView.builder(
+                      itemCount: colors.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 168,
+                            mainAxisExtent: 76,
+                            crossAxisSpacing: 9,
+                            mainAxisSpacing: 9,
+                          ),
+                      itemBuilder: (context, index) {
+                        final color = colors[index];
+                        return Material(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withValues(alpha: 0.55),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outlineVariant,
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            key: ValueKey('palette-color-${color.code}'),
+                            onTap: () => Navigator.of(context).pop(color),
+                            child: Padding(
+                              padding: const EdgeInsets.all(9),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: color.color,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 9),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          color.code,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        Text(
+                                          color.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.labelSmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
         ),
       ],
     );
@@ -935,6 +1304,8 @@ class _EmptyView extends StatelessWidget {
 }
 
 enum _WideStatisticsPlacement { bottom, compactBottom, side }
+
+enum _ProjectAction { open, save }
 
 enum _StatisticsLayout { horizontal, vertical, wrap }
 

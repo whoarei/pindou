@@ -15,10 +15,23 @@
 - Perler、Hama、Artkal 三套品牌色库
 - LAB 色彩空间匹配、最大颜色数限制
 - 可选 Floyd–Steinberg 误差扩散抖动
-- CustomPainter 高性能网格预览、缩放查看
+- CustomPainter 高性能网格预览、缩放查看，可开关色号图层
+- 单格/多格选择、选择同色及品牌色盘替色
 - 颜色编号与用量统计
-- 导出含/不含网格的高分辨率 JPG
+- 导出含/不含网格及色号的高分辨率 JPG
+- `.pindou` 工程文件保存和恢复，启动时自动恢复上次编辑
 - 跟随系统浅色/深色主题，响应式适配手机与桌面
+
+## 工程文件与自动恢复
+
+工具栏的工程菜单支持保存和打开 `.pindou` 文件。工程文件包含原图、裁剪区域、生成参数、色号图层开关、生成结果、手工替色结果和当前选区，可复制到其他 Android 或 Windows 设备继续编辑。
+
+应用会在编辑后约 600 毫秒自动保存当前状态，并在下次启动时恢复：
+
+- Android：应用私有 `files/pindou-studio/autosave.pindou`。
+- Windows：`%APPDATA%\PindouStudio\autosave.pindou`。
+
+卸载 Android 应用或清除应用数据会删除自动恢复文件；手动保存的 `.pindou` 工程文件不受影响。工程文件内嵌原图，因此文件大小通常会略大于原图。
 
 ## 开发环境
 
@@ -74,12 +87,12 @@ Release 构建必须提供上述正式签名配置；缺少 `key.properties` 时
 
 `.github/workflows/release.yml` 支持两种触发方式：
 
-- 推送 `v` 开头的标签，例如 `git tag v1.0.0 && git push origin v1.0.0`。构建完成后会自动创建 GitHub Release，并附加 Android APK 和 Windows x64 便携 ZIP。
+- 推送 `v` 开头的标签，例如 `git tag v1.2.0 && git push origin v1.2.0`。构建完成后会自动创建 GitHub Release，并附加 Android APK 和 Windows x64 便携 ZIP。
 - 在 GitHub 的 Actions 页面手动运行 **Build releases**。手动运行不会创建 Release，APK 和 Windows ZIP 可从该次运行的 Artifacts 下载。
 
-标签 `v1.0.0` 对应的发布文件名为：
+以标签 `v1.2.0` 为例，发布文件名为：
 
-- Android：`PindouStudio-v1.0.0-android.apk`
-- Windows：`PindouStudio-v1.0.0-windows-x64.zip`
+- Android：`PindouStudio-v1.2.0-android.apk`
+- Windows：`PindouStudio-v1.2.0-windows-x64.zip`
 
 Windows 产物是包含 DLL 和 `data` 目录的便携压缩包，解压后运行其中的 `PindouStudio.exe`。
