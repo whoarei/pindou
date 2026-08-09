@@ -45,13 +45,9 @@ android {
 
     buildTypes {
         release {
-            // Use the local/CI release key when key.properties is present.
-            // Fall back to the debug key for development machines without secrets.
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            // Release artifacts must never silently fall back to the debug key.
+            // Local builds use android/key.properties; CI restores it from Secrets.
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

@@ -66,6 +66,8 @@ storeFile=E:/Android/libb.keystore
 E:\Android\flutter\bin\flutter.bat build apk --release
 ```
 
+Release 构建必须提供上述正式签名配置；缺少 `key.properties` 时构建会失败，不会回退生成 Debug 签名 APK。
+
 请勿将 `key.properties`、keystore 文件或密码提交到 Git 仓库。GitHub Actions 使用仓库 Secrets 自动恢复相同的签名配置。
 
 ## GitHub Actions 发布构建
