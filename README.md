@@ -38,3 +38,12 @@ E:\Android\flutter\bin\flutter.bat build windows --release
 ```
 
 Windows 文件对话框通过 Runner 原生 C++ 异步通道实现，不依赖 Flutter 插件或开发人员模式。
+
+## GitHub Actions 发布构建
+
+`.github/workflows/release.yml` 支持两种触发方式：
+
+- 推送 `v` 开头的标签，例如 `git tag v1.0.0 && git push origin v1.0.0`。构建完成后会自动创建 GitHub Release，并附加 Android APK 和 Windows x64 便携 ZIP。
+- 在 GitHub 的 Actions 页面手动运行 **Build releases**。手动运行不会创建 Release，APK 和 Windows ZIP 可从该次运行的 Artifacts 下载。
+
+Windows 产物是包含 DLL 和 `data` 目录的便携压缩包，解压后运行其中的 `bead_pattern_generator.exe`。
