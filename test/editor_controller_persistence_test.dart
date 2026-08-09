@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:pindou_studio/features/editor/editor_controller.dart';
+import 'package:pindou_studio/features/editor/editor_state.dart';
 import 'package:pindou_studio/services/palette_service.dart';
 
 void main() {
@@ -49,5 +50,43 @@ void main() {
     expect(restored.state.sourceBytes, sourceBytes);
     expect(restored.state.showColorCodes, isFalse);
     expect(restored.state.noticeMessage, '已自动恢复上次编辑');
+  });
+
+  test('autosaves and restores a blank pattern without source bytes', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'pindou-blank-autosave-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+
+    final first = EditorController(
+      const PaletteService(),
+      autosaveDirectoryPath: directory.path,
+    );
+    await first.initialize();
+    first.setPatternWidth(12);
+    first.setPatternHeight(10);
+    first.createBlankPattern();
+    final paintColor = first.state.selectedPalette!.colors.last;
+    first.setBrushColor(paintColor);
+    first.paintCells(const [0, 119]);
+    await first.flushAutosave();
+    first.dispose();
+
+    final restored = EditorController(
+      const PaletteService(),
+      autosaveDirectoryPath: directory.path,
+    );
+    await restored.initialize();
+    addTearDown(restored.dispose);
+
+    final pattern = restored.state.pattern!;
+    expect(restored.state.sourceBytes, isNull);
+    expect(pattern.width, 12);
+    expect(pattern.height, 10);
+    expect(pattern.colors[pattern.colorIndices[0]], paintColor);
+    expect(pattern.colors[pattern.colorIndices[119]], paintColor);
+    expect(restored.state.editTool, EditorTool.brush);
+    expect(restored.state.brushColorCode, paintColor.code);
+    expect(restored.state.canUndo, isFalse);
   });
 }

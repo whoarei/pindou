@@ -204,6 +204,32 @@ class EditorController extends StateNotifier<EditorState> {
     _updateState(state.copyWith(showColorCodes: value));
   }
 
+  void createBlankPattern() {
+    final palette = state.selectedPalette;
+    if (palette == null || state.isProcessing) return;
+    final background = palette.colors.first;
+    final pattern = Pattern.filled(
+      width: state.patternWidth,
+      height: state.patternHeight,
+      color: background,
+    );
+    _resetEditHistory();
+    _updateState(
+      state.copyWith(
+        clearSource: true,
+        pattern: pattern,
+        editTool: EditorTool.pan,
+        brushColorCode: background.code,
+        clearSelection: true,
+        canUndo: false,
+        canRedo: false,
+        clearError: true,
+        noticeMessage:
+            '已新建 ${pattern.width} × ${pattern.height} 空白图案（${palette.brand} ${background.code}）',
+      ),
+    );
+  }
+
   void setColorEditing(bool value) {
     setEditorTool(value ? EditorTool.select : EditorTool.pan);
   }

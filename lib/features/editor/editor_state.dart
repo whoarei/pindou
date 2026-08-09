@@ -74,6 +74,8 @@ class EditorState {
   bool get canGenerate =>
       sourceBytes != null && selectedPalette != null && !isProcessing;
 
+  bool get canCreateBlank => selectedPalette != null && !isProcessing;
+
   bool get isColorEditing => editTool != EditorTool.pan;
 
   BeadColor? get selectedBrushColor {
@@ -100,6 +102,7 @@ class EditorState {
     String? sourceName,
     int? sourceWidth,
     int? sourceHeight,
+    bool clearSource = false,
     CropSpec? crop,
     int? patternWidth,
     int? patternHeight,
@@ -128,11 +131,11 @@ class EditorState {
     return EditorState(
       palettes: palettes ?? this.palettes,
       selectedBrand: selectedBrand ?? this.selectedBrand,
-      sourceBytes: sourceBytes ?? this.sourceBytes,
-      sourceName: sourceName ?? this.sourceName,
-      sourceWidth: sourceWidth ?? this.sourceWidth,
-      sourceHeight: sourceHeight ?? this.sourceHeight,
-      crop: crop ?? this.crop,
+      sourceBytes: clearSource ? null : (sourceBytes ?? this.sourceBytes),
+      sourceName: clearSource ? null : (sourceName ?? this.sourceName),
+      sourceWidth: clearSource ? null : (sourceWidth ?? this.sourceWidth),
+      sourceHeight: clearSource ? null : (sourceHeight ?? this.sourceHeight),
+      crop: clearSource ? CropSpec.full : (crop ?? this.crop),
       patternWidth: patternWidth ?? this.patternWidth,
       patternHeight: patternHeight ?? this.patternHeight,
       lockAspectRatio: lockAspectRatio ?? this.lockAspectRatio,

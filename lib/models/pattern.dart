@@ -12,6 +12,21 @@ class Pattern {
     required this.counts,
   });
 
+  factory Pattern.filled({
+    required int width,
+    required int height,
+    required BeadColor color,
+  }) {
+    final total = width * height;
+    return Pattern(
+      width: width,
+      height: height,
+      colorIndices: List<int>.unmodifiable(List<int>.filled(total, 0)),
+      colors: List<BeadColor>.unmodifiable(<BeadColor>[color]),
+      counts: List<int>.unmodifiable(<int>[total]),
+    );
+  }
+
   final int width;
   final int height;
   final List<int> colorIndices;

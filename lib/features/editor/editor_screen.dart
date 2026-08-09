@@ -380,48 +380,97 @@ class _SourceCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             if (bytes == null)
-              InkWell(
-                onTap: controller.pickImage,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 28,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer.withValues(alpha: 0.28),
+              Column(
+                children: [
+                  InkWell(
+                    onTap: controller.pickImage,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.34),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.cloud_upload_outlined,
-                        size: 38,
-                        color: Theme.of(context).colorScheme.primary,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 28,
                       ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '选择一张图片',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '支持 JPG、PNG',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer.withValues(alpha: 0.28),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.34),
                         ),
                       ),
-                    ],
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.cloud_upload_outlined,
+                            size: 38,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            '选择一张图片',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '支持 JPG、PNG',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    child: Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Text(
+                            '或者',
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('new-blank-pattern'),
+                      onPressed: state.canCreateBlank
+                          ? controller.createBlankPattern
+                          : null,
+                      icon: const Icon(Icons.grid_on_rounded),
+                      label: Text(
+                        '新建 ${state.patternWidth} × ${state.patternHeight} 空白图案',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '使用当前品牌色库的白色色号铺底，可直接使用画笔创作',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               )
             else
               Row(
@@ -474,6 +523,11 @@ class _SourceCard extends StatelessWidget {
                               icon: Icons.swap_horiz_rounded,
                               label: '更换',
                               onPressed: controller.pickImage,
+                            ),
+                            _SmallAction(
+                              icon: Icons.grid_on_rounded,
+                              label: '新建空白',
+                              onPressed: controller.createBlankPattern,
                             ),
                           ],
                         ),
@@ -1855,7 +1909,7 @@ class _EmptyView extends StatelessWidget {
             ),
             const SizedBox(height: 7),
             Text(
-              '先导入一张 JPG 或 PNG 图片，再选择尺寸和品牌色库。',
+              '可以导入一张 JPG 或 PNG 图片，也可以按当前参数新建空白图案。',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,

@@ -23,7 +23,70 @@ void main() {
     expect(find.text('导入图片'), findsOneWidget);
     expect(find.text('拼豆参数'), findsOneWidget);
     expect(find.text('选择一张图片'), findsOneWidget);
+    expect(find.byKey(const ValueKey('new-blank-pattern')), findsOneWidget);
     expect(find.text('生成拼豆图'), findsOneWidget);
+  });
+
+  testWidgets('creates a blank pattern without importing an image', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const white = BeadColor(
+      code: 'P01',
+      name: 'White',
+      red: 245,
+      green: 245,
+      blue: 240,
+    );
+    const blue = BeadColor(
+      code: 'P02',
+      name: 'Blue',
+      red: 30,
+      green: 55,
+      blue: 220,
+    );
+    final controller = _PresetEditorController(
+      const EditorState(
+        palettes: [
+          BeadPalette(brand: 'Test', colors: [white, blue]),
+        ],
+        selectedBrand: 'Test',
+        patternWidth: 12,
+        patternHeight: 8,
+        lockAspectRatio: false,
+        brushColorCode: 'P02',
+        isLoadingPalettes: false,
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [editorProvider.overrideWith((ref) => controller)],
+        child: const BeadPatternApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('新建 12 × 8 空白图案'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('new-blank-pattern')));
+    await tester.pumpAndSettle();
+
+    final pattern = controller.state.pattern!;
+    expect(controller.state.sourceBytes, isNull);
+    expect(pattern.width, 12);
+    expect(pattern.height, 8);
+    expect(pattern.colors, [white]);
+    expect(pattern.counts, [96]);
+    expect(pattern.colorIndices, everyElement(0));
+    expect(controller.state.editTool, EditorTool.pan);
+    expect(controller.state.canUndo, isFalse);
+    expect(find.byKey(const ValueKey('brush-tool')), findsOneWidget);
+    expect(find.text('96 颗 · 1 色'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('uses side statistics on an 8-inch landscape tablet', (

@@ -94,4 +94,25 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('clears imported source metadata when switching to a blank pattern', () {
+    final imported = EditorState(
+      sourceBytes: Uint8List.fromList([1, 2, 3]),
+      sourceName: 'old.png',
+      sourceWidth: 640,
+      sourceHeight: 480,
+      crop: const CropSpec(left: 0.1, top: 0.1, width: 0.8, height: 0.8),
+    );
+    final blank = imported.copyWith(
+      clearSource: true,
+      pattern: Pattern.filled(width: 8, height: 8, color: red),
+    );
+
+    expect(blank.sourceBytes, isNull);
+    expect(blank.sourceName, isNull);
+    expect(blank.sourceWidth, isNull);
+    expect(blank.sourceHeight, isNull);
+    expect(blank.crop, CropSpec.full);
+    expect(blank.pattern!.totalBeads, 64);
+  });
 }
