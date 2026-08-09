@@ -103,7 +103,16 @@ class EditorScreen extends ConsumerWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth >= 920) {
-              return _DesktopEditor(state: state, controller: controller);
+              final statisticsPlacement = constraints.maxHeight >= 720
+                  ? _WideStatisticsPlacement.bottom
+                  : constraints.maxWidth >= 1050
+                  ? _WideStatisticsPlacement.side
+                  : _WideStatisticsPlacement.compactBottom;
+              return _DesktopEditor(
+                state: state,
+                controller: controller,
+                statisticsPlacement: statisticsPlacement,
+              );
             }
             return _MobileEditor(state: state, controller: controller);
           },
@@ -133,17 +142,25 @@ class EditorScreen extends ConsumerWidget {
 }
 
 class _DesktopEditor extends ConsumerWidget {
-  const _DesktopEditor({required this.state, required this.controller});
+  const _DesktopEditor({
+    required this.state,
+    required this.controller,
+    required this.statisticsPlacement,
+  });
 
   final EditorState state;
   final EditorController controller;
+  final _WideStatisticsPlacement statisticsPlacement;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final usesCompactControls =
+        statisticsPlacement != _WideStatisticsPlacement.bottom;
     return Row(
+      key: ValueKey('wide-editor-${statisticsPlacement.name}'),
       children: [
         SizedBox(
-          width: 374,
+          width: usesCompactControls ? 350 : 374,
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(18, 16, 12, 24),
             child: Column(
@@ -162,20 +179,51 @@ class _DesktopEditor extends ConsumerWidget {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-            child: Column(
-              children: [
-                Expanded(
-                  child: _WorkspaceCard(state: state, controller: controller),
-                ),
-                if (state.pattern != null) ...[
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    height: 220,
-                    child: _StatisticsCard(pattern: state.pattern!),
+            child:
+                state.pattern != null &&
+                    statisticsPlacement == _WideStatisticsPlacement.side
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: _WorkspaceCard(
+                          state: state,
+                          controller: controller,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      SizedBox(
+                        width: 300,
+                        child: _StatisticsCard(
+                          pattern: state.pattern!,
+                          layout: _StatisticsLayout.vertical,
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Expanded(
+                        child: _WorkspaceCard(
+                          state: state,
+                          controller: controller,
+                        ),
+                      ),
+                      if (state.pattern != null) ...[
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          height:
+                              statisticsPlacement ==
+                                  _WideStatisticsPlacement.compactBottom
+                              ? 156
+                              : 220,
+                          child: _StatisticsCard(
+                            pattern: state.pattern!,
+                            layout: _StatisticsLayout.horizontal,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-              ],
-            ),
           ),
         ),
       ],
@@ -207,7 +255,10 @@ class _MobileEditor extends StatelessWidget {
               ),
               if (state.pattern != null) ...[
                 const SizedBox(height: 12),
-                _StatisticsCard(pattern: state.pattern!),
+                _StatisticsCard(
+                  pattern: state.pattern!,
+                  layout: _StatisticsLayout.wrap,
+                ),
               ],
             ],
           ),
@@ -835,10 +886,15 @@ class _EmptyView extends StatelessWidget {
   }
 }
 
+enum _WideStatisticsPlacement { bottom, compactBottom, side }
+
+enum _StatisticsLayout { horizontal, vertical, wrap }
+
 class _StatisticsCard extends StatelessWidget {
-  const _StatisticsCard({required this.pattern});
+  const _StatisticsCard({required this.pattern, required this.layout});
 
   final Pattern pattern;
+  final _StatisticsLayout layout;
 
   @override
   Widget build(BuildContext context) {
@@ -848,7 +904,9 @@ class _StatisticsCard extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: layout == _StatisticsLayout.wrap
+              ? MainAxisSize.min
+              : MainAxisSize.max,
           children: [
             Row(
               children: [
@@ -867,7 +925,7 @@ class _StatisticsCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            if (MediaQuery.sizeOf(context).width >= 920)
+            if (layout == _StatisticsLayout.horizontal)
               Expanded(
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
@@ -875,6 +933,17 @@ class _StatisticsCard extends StatelessWidget {
                   separatorBuilder: (_, _) => const SizedBox(width: 9),
                   itemBuilder: (context, index) => SizedBox(
                     width: 175,
+                    child: _ColorTile(usage: usages[index]),
+                  ),
+                ),
+              )
+            else if (layout == _StatisticsLayout.vertical)
+              Expanded(
+                child: ListView.separated(
+                  itemCount: usages.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 9),
+                  itemBuilder: (context, index) => SizedBox(
+                    height: 66,
                     child: _ColorTile(usage: usages[index]),
                   ),
                 ),
