@@ -19,7 +19,7 @@
 namespace {
 
 constexpr UINT kFileDialogCompleteMessage = WM_APP + 0x421;
-constexpr char kFilesChannel[] = "com.pindou.studio/files";
+constexpr char kFilesChannel[] = "top.mossmoss.pindoustudio/files";
 
 struct FileDialogOutcome {
   std::wstring path;

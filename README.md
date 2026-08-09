@@ -2,6 +2,10 @@
 
 一款基于 Flutter 的跨平台拼豆图生成应用，当前适配 Android 与 Windows。
 
+- 产品名：拼豆工坊（Pindou Studio）
+- Android 应用标识：`top.mossmoss.pindoustudio`
+- Dart 包名：`pindou_studio`
+
 ## 功能
 
 - 导入 JPG、PNG 图片
