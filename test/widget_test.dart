@@ -67,7 +67,27 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('wide-editor-side')), findsOneWidget);
+    expect(find.byKey(const ValueKey('control-panel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('statistics-panel')), findsOneWidget);
     expect(find.text('颜色用量'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    final initialWorkspaceWidth = tester
+        .getSize(find.byKey(const ValueKey('workspace-panel')))
+        .width;
+
+    await tester.tap(find.byKey(const ValueKey('toggle-control-panel')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('control-panel')), findsNothing);
+    expect(find.byKey(const ValueKey('statistics-panel')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('toggle-statistics-panel')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('statistics-panel')), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('workspace-panel'))).width,
+      greaterThan(initialWorkspaceWidth),
+    );
     expect(tester.takeException(), isNull);
   });
 }

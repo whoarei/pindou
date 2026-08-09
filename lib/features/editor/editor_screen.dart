@@ -141,7 +141,7 @@ class EditorScreen extends ConsumerWidget {
   }
 }
 
-class _DesktopEditor extends ConsumerWidget {
+class _DesktopEditor extends StatefulWidget {
   const _DesktopEditor({
     required this.state,
     required this.controller,
@@ -153,45 +153,79 @@ class _DesktopEditor extends ConsumerWidget {
   final _WideStatisticsPlacement statisticsPlacement;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  State<_DesktopEditor> createState() => _DesktopEditorState();
+}
+
+class _DesktopEditorState extends State<_DesktopEditor> {
+  bool _showControls = true;
+  bool _showStatistics = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final controller = widget.controller;
+    final statisticsPlacement = widget.statisticsPlacement;
     final usesCompactControls =
         statisticsPlacement != _WideStatisticsPlacement.bottom;
+    final usesSideStatistics =
+        statisticsPlacement == _WideStatisticsPlacement.side;
+    final showControls = !usesSideStatistics || _showControls;
+    final showStatistics =
+        state.pattern != null && usesSideStatistics && _showStatistics;
+    final panelControls = usesSideStatistics
+        ? _PanelVisibilityControls(
+            showControls: _showControls,
+            showStatistics: _showStatistics,
+            canToggleStatistics: state.pattern != null,
+            onToggleControls: () {
+              setState(() => _showControls = !_showControls);
+            },
+            onToggleStatistics: () {
+              setState(() => _showStatistics = !_showStatistics);
+            },
+          )
+        : null;
+
     return Row(
       key: ValueKey('wide-editor-${statisticsPlacement.name}'),
       children: [
-        SizedBox(
-          width: usesCompactControls ? 350 : 374,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 16, 12, 24),
-            child: Column(
-              children: [
-                _SourceCard(state: state, controller: controller),
-                const SizedBox(height: 14),
-                _ParametersCard(state: state, controller: controller),
-              ],
+        if (showControls)
+          SizedBox(
+            key: const ValueKey('control-panel'),
+            width: usesCompactControls ? 350 : 374,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(18, 16, 12, 24),
+              child: Column(
+                children: [
+                  _SourceCard(state: state, controller: controller),
+                  const SizedBox(height: 14),
+                  _ParametersCard(state: state, controller: controller),
+                ],
+              ),
             ),
           ),
-        ),
-        VerticalDivider(
-          width: 1,
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        if (showControls)
+          VerticalDivider(
+            width: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-            child:
-                state.pattern != null &&
-                    statisticsPlacement == _WideStatisticsPlacement.side
+            child: showStatistics
                 ? Row(
                     children: [
                       Expanded(
                         child: _WorkspaceCard(
+                          key: const ValueKey('workspace-panel'),
                           state: state,
                           controller: controller,
+                          panelControls: panelControls,
                         ),
                       ),
                       const SizedBox(width: 14),
                       SizedBox(
+                        key: const ValueKey('statistics-panel'),
                         width: 300,
                         child: _StatisticsCard(
                           pattern: state.pattern!,
@@ -204,11 +238,13 @@ class _DesktopEditor extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: _WorkspaceCard(
+                          key: const ValueKey('workspace-panel'),
                           state: state,
                           controller: controller,
+                          panelControls: panelControls,
                         ),
                       ),
-                      if (state.pattern != null) ...[
+                      if (state.pattern != null && !usesSideStatistics) ...[
                         const SizedBox(height: 14),
                         SizedBox(
                           height:
@@ -585,10 +621,16 @@ class _ParametersCard extends StatelessWidget {
 }
 
 class _WorkspaceCard extends StatelessWidget {
-  const _WorkspaceCard({required this.state, required this.controller});
+  const _WorkspaceCard({
+    required this.state,
+    required this.controller,
+    this.panelControls,
+    super.key,
+  });
 
   final EditorState state;
   final EditorController controller;
+  final Widget? panelControls;
 
   @override
   Widget build(BuildContext context) {
@@ -607,16 +649,22 @@ class _WorkspaceCard extends StatelessWidget {
                   icon: Icons.grid_4x4_rounded,
                 ),
                 const Spacer(),
+                if (panelControls != null) ...[
+                  panelControls!,
+                  const SizedBox(width: 7),
+                ],
                 if (pattern != null) ...[
                   _StatusPill(
                     icon: Icons.apps_rounded,
                     label: '${pattern.width} × ${pattern.height}',
                   ),
-                  const SizedBox(width: 7),
-                  _StatusPill(
-                    icon: Icons.circle,
-                    label: '${pattern.colors.length} 色',
-                  ),
+                  if (panelControls == null) ...[
+                    const SizedBox(width: 7),
+                    _StatusPill(
+                      icon: Icons.circle,
+                      label: '${pattern.colors.length} 色',
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -1254,6 +1302,85 @@ class _SmallAction extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(icon, size: 16),
       label: Text(label, style: const TextStyle(fontSize: 12)),
+    );
+  }
+}
+
+class _PanelVisibilityControls extends StatelessWidget {
+  const _PanelVisibilityControls({
+    required this.showControls,
+    required this.showStatistics,
+    required this.canToggleStatistics,
+    required this.onToggleControls,
+    required this.onToggleStatistics,
+  });
+
+  final bool showControls;
+  final bool showStatistics;
+  final bool canToggleStatistics;
+  final VoidCallback onToggleControls;
+  final VoidCallback onToggleStatistics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _PanelVisibilityButton(
+          key: const ValueKey('toggle-control-panel'),
+          icon: Icons.tune_rounded,
+          isVisible: showControls,
+          tooltip: showControls ? '隐藏参数栏' : '显示参数栏',
+          onPressed: onToggleControls,
+        ),
+        if (canToggleStatistics) ...[
+          const SizedBox(width: 4),
+          _PanelVisibilityButton(
+            key: const ValueKey('toggle-statistics-panel'),
+            icon: Icons.format_list_numbered_rounded,
+            isVisible: showStatistics,
+            tooltip: showStatistics ? '隐藏颜色用量栏' : '显示颜色用量栏',
+            onPressed: onToggleStatistics,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PanelVisibilityButton extends StatelessWidget {
+  const _PanelVisibilityButton({
+    required this.icon,
+    required this.isVisible,
+    required this.tooltip,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final bool isVisible;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      style: IconButton.styleFrom(
+        backgroundColor: isVisible
+            ? scheme.primaryContainer
+            : scheme.surfaceContainerHighest,
+        foregroundColor: isVisible
+            ? scheme.onPrimaryContainer
+            : scheme.onSurfaceVariant,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      icon: Icon(icon, size: 18),
     );
   }
 }
