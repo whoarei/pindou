@@ -113,18 +113,36 @@ void main() {
       green: 55,
       blue: 220,
     );
+    const green = BeadColor(
+      code: 'P03',
+      name: 'Green',
+      red: 35,
+      green: 205,
+      blue: 85,
+    );
+    final paletteColors = <BeadColor>[
+      red,
+      blue,
+      green,
+      for (var index = 4; index <= 32; index++)
+        BeadColor(
+          code: 'P${index.toString().padLeft(2, '0')}',
+          name: 'Color $index',
+          red: (index * 47) % 256,
+          green: (index * 83) % 256,
+          blue: (index * 131) % 256,
+        ),
+    ];
     final controller = _PresetEditorController(
-      const EditorState(
-        palettes: [
-          BeadPalette(brand: 'Test', colors: [red, blue]),
-        ],
+      EditorState(
+        palettes: [BeadPalette(brand: 'Test', colors: paletteColors)],
         selectedBrand: 'Test',
-        pattern: Pattern(
+        pattern: const Pattern(
           width: 2,
           height: 2,
-          colorIndices: [0, 0, 0, 0],
-          colors: [red],
-          counts: [4],
+          colorIndices: [0, 1, 0, 1],
+          colors: [red, blue],
+          counts: [2, 2],
         ),
         isLoadingPalettes: false,
       ),
@@ -154,12 +172,49 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('replace-selected-color')));
     await tester.pumpAndSettle();
     expect(find.text('选择 Test 色号'), findsOneWidget);
+    expect(find.text('特殊边框：当前选区的 2 个色号'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('current-color-marker-P01')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('current-color-marker-P02')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('current-color-marker-P03')),
+      findsNothing,
+    );
 
-    await tester.tap(find.byKey(const ValueKey('palette-color-P02')));
+    final colorGrid = tester.widget<GridView>(
+      find.byKey(const ValueKey('palette-color-grid')),
+    );
+    final gridDelegate =
+        colorGrid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+    final desktopColumns = gridDelegate.crossAxisCount;
+    expect(desktopColumns, greaterThan(1));
+    expect(colorGrid.physics, isA<NeverScrollableScrollPhysics>());
+    expect(
+      find.byKey(const ValueKey('palette-grid-dimensions')),
+      findsOneWidget,
+    );
+
+    tester.view.physicalSize = const Size(500, 800);
+    await tester.pumpAndSettle();
+    final narrowGrid = tester.widget<GridView>(
+      find.byKey(const ValueKey('palette-color-grid')),
+    );
+    final narrowDelegate =
+        narrowGrid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+    expect(narrowDelegate.crossAxisCount, lessThan(desktopColumns));
+    expect(find.byKey(const ValueKey('palette-color-P32')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('palette-color-P03')));
     await tester.pumpAndSettle();
 
-    expect(controller.state.pattern!.counts, [2, 2]);
-    expect(controller.state.pattern!.colors, [red, blue]);
+    expect(controller.state.pattern!.counts, [1, 1, 2]);
+    expect(controller.state.pattern!.colors, [red, blue, green]);
+    expect(controller.state.pattern!.colorIndices, [2, 2, 0, 1]);
     expect(controller.state.selectedCells, isEmpty);
     expect(tester.takeException(), isNull);
   });

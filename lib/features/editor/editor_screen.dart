@@ -959,10 +959,18 @@ class _PatternViewState extends State<_PatternView> {
   Future<void> _showColorPicker() async {
     if (widget.state.selectedCells.isEmpty) return;
     final palette = widget.state.selectedPalette;
-    if (palette == null) return;
+    final pattern = widget.state.pattern;
+    if (palette == null || pattern == null) return;
+    final currentColorCodes = <String>{
+      for (final cell in widget.state.selectedCells)
+        pattern.colors[pattern.colorIndices[cell]].code,
+    };
     final selected = await showDialog<BeadColor>(
       context: context,
-      builder: (context) => _ColorPickerDialog(palette: palette),
+      builder: (context) => _ColorPickerDialog(
+        palette: palette,
+        currentColorCodes: currentColorCodes,
+      ),
     );
     if (selected != null) widget.controller.replaceSelectedColor(selected);
   }
@@ -1033,129 +1041,123 @@ class _SelectionToolbar extends StatelessWidget {
   }
 }
 
-class _ColorPickerDialog extends StatefulWidget {
-  const _ColorPickerDialog({required this.palette});
+class _ColorPickerDialog extends StatelessWidget {
+  const _ColorPickerDialog({
+    required this.palette,
+    required this.currentColorCodes,
+  });
 
   final BeadPalette palette;
-
-  @override
-  State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
-}
-
-class _ColorPickerDialogState extends State<_ColorPickerDialog> {
-  String _query = '';
+  final Set<String> currentColorCodes;
 
   @override
   Widget build(BuildContext context) {
-    final query = _query.trim().toLowerCase();
-    final colors = query.isEmpty
-        ? widget.palette.colors
-        : widget.palette.colors
-              .where(
-                (color) =>
-                    color.code.toLowerCase().contains(query) ||
-                    color.name.toLowerCase().contains(query),
-              )
-              .toList(growable: false);
     final mediaSize = MediaQuery.sizeOf(context);
     return AlertDialog(
-      title: Text('选择 ${widget.palette.brand} 色号'),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('选择 ${palette.brand} 色号'),
+          const SizedBox(height: 4),
+          Text(
+            '对比全部颜色，点击目标色号后立即替换',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
       content: SizedBox(
-        width: math.min(720, mediaSize.width - 64),
-        height: math.min(570, mediaSize.height * 0.68),
-        child: Column(
-          children: [
-            TextField(
-              autofocus: true,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search_rounded),
-                hintText: '搜索色号或颜色名称',
+        width: math.min(760, mediaSize.width - 48),
+        height: math.min(600, mediaSize.height * 0.68),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const informationHeight = 36.0;
+            const gridGap = 7.0;
+            final geometry = _calculateColorGridGeometry(
+              size: Size(
+                constraints.maxWidth,
+                math.max(1, constraints.maxHeight - informationHeight),
               ),
-              onChanged: (value) => setState(() => _query = value),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: colors.isEmpty
-                  ? const Center(child: Text('没有匹配的色号'))
-                  : GridView.builder(
-                      itemCount: colors.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 168,
-                            mainAxisExtent: 76,
-                            crossAxisSpacing: 9,
-                            mainAxisSpacing: 9,
+              itemCount: palette.colors.length,
+              gap: gridGap,
+            );
+            return Column(
+              children: [
+                SizedBox(
+                  height: informationHeight,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 3,
                           ),
-                      itemBuilder: (context, index) {
-                        final color = colors[index];
-                        return Material(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withValues(alpha: 0.55),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outlineVariant,
+                        ),
+                        child: Icon(
+                          Icons.check_rounded,
+                          size: 13,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          '特殊边框：当前选区的 ${currentColorCodes.length} 个色号',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${geometry.rows} 行 × ${geometry.columns} 列',
+                        key: const ValueKey('palette-grid-dimensions'),
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w800,
                             ),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            key: ValueKey('palette-color-${color.code}'),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Center(
+                    child: SizedBox(
+                      width: geometry.width,
+                      height: geometry.height,
+                      child: GridView.builder(
+                        key: const ValueKey('palette-color-grid'),
+                        padding: EdgeInsets.zero,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: palette.colors.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: geometry.columns,
+                          crossAxisSpacing: gridGap,
+                          mainAxisSpacing: gridGap,
+                        ),
+                        itemBuilder: (context, index) {
+                          final color = palette.colors[index];
+                          return _PaletteColorCell(
+                            color: color,
+                            isCurrent: currentColorCodes.contains(color.code),
                             onTap: () => Navigator.of(context).pop(color),
-                            child: Padding(
-                              padding: const EdgeInsets.all(9),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color: color.color,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.2,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 9),
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          color.code,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                        Text(
-                                          color.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.labelSmall,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-            ),
-          ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
       actions: [
@@ -1166,6 +1168,177 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
       ],
     );
   }
+}
+
+class _PaletteColorCell extends StatelessWidget {
+  const _PaletteColorCell({
+    required this.color,
+    required this.isCurrent,
+    required this.onTap,
+  });
+
+  final BeadColor color;
+  final bool isCurrent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final foreground = color.color.computeLuminance() > 0.43
+        ? const Color(0xff17191b)
+        : Colors.white;
+    return Semantics(
+      button: true,
+      selected: isCurrent,
+      label: '${color.code} ${color.name}${isCurrent ? '，当前选区颜色' : ''}',
+      child: Tooltip(
+        message: '${color.code} · ${color.name}${isCurrent ? '（当前选区）' : ''}',
+        child: AnimatedContainer(
+          key: ValueKey('palette-color-${color.code}'),
+          duration: const Duration(milliseconds: 160),
+          padding: EdgeInsets.all(isCurrent ? 4 : 1),
+          decoration: BoxDecoration(
+            color: isCurrent ? colorScheme.primary : colorScheme.outlineVariant,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isCurrent
+                ? [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.42),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Material(
+            color: color.color,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(
+                color: isCurrent
+                    ? Colors.white.withValues(alpha: 0.92)
+                    : Colors.black.withValues(alpha: 0.18),
+                width: isCurrent ? 2 : 1,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          color.code,
+                          style: TextStyle(
+                            color: foreground,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            shadows: [
+                              Shadow(
+                                color: foreground == Colors.white
+                                    ? Colors.black.withValues(alpha: 0.45)
+                                    : Colors.white.withValues(alpha: 0.42),
+                                blurRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (isCurrent)
+                    Positioned(
+                      top: 5,
+                      right: 5,
+                      child: Container(
+                        key: ValueKey('current-color-marker-${color.code}'),
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colorScheme.onPrimary),
+                        ),
+                        child: Icon(
+                          Icons.check_rounded,
+                          size: 15,
+                          color: colorScheme.onPrimary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorGridGeometry {
+  const _ColorGridGeometry({
+    required this.rows,
+    required this.columns,
+    required this.cellExtent,
+    required this.gap,
+  });
+
+  final int rows;
+  final int columns;
+  final double cellExtent;
+  final double gap;
+
+  double get width => columns * cellExtent + (columns - 1) * gap;
+  double get height => rows * cellExtent + (rows - 1) * gap;
+}
+
+_ColorGridGeometry _calculateColorGridGeometry({
+  required Size size,
+  required int itemCount,
+  required double gap,
+}) {
+  assert(itemCount > 0);
+  var bestColumns = 1;
+  var bestRows = itemCount;
+  var bestExtent = 0.0;
+  var bestRatioDifference = double.infinity;
+  final availableRatio = size.width / math.max(1, size.height);
+
+  for (var columns = 1; columns <= itemCount; columns++) {
+    final rows = (itemCount + columns - 1) ~/ columns;
+    final widthWithoutGaps = size.width - (columns - 1) * gap;
+    final heightWithoutGaps = size.height - (rows - 1) * gap;
+    if (widthWithoutGaps <= 0 || heightWithoutGaps <= 0) continue;
+    final extent = math.min(
+      112.0,
+      math.min(widthWithoutGaps / columns, heightWithoutGaps / rows),
+    );
+    final gridRatio = columns / rows;
+    final ratioDifference = (gridRatio - availableRatio).abs();
+    final isLarger = extent > bestExtent + 0.01;
+    final isBetterTie =
+        (extent - bestExtent).abs() <= 0.01 &&
+        ratioDifference < bestRatioDifference;
+    if (isLarger || isBetterTie) {
+      bestColumns = columns;
+      bestRows = rows;
+      bestExtent = extent;
+      bestRatioDifference = ratioDifference;
+    }
+  }
+
+  return _ColorGridGeometry(
+    rows: bestRows,
+    columns: bestColumns,
+    cellExtent: bestExtent,
+    gap: gap,
+  );
 }
 
 class _ReadyView extends StatelessWidget {
