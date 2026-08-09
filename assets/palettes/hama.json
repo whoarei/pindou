@@ -1,0 +1,33 @@
+{
+  "brand": "Hama",
+  "colors": [
+    {"code":"H01","name":"White","rgb":[248,248,242]},
+    {"code":"H02","name":"Cream","rgb":[241,226,181]},
+    {"code":"H03","name":"Yellow","rgb":[244,205,43]},
+    {"code":"H04","name":"Orange","rgb":[235,101,32]},
+    {"code":"H05","name":"Red","rgb":[190,43,45]},
+    {"code":"H06","name":"Pink","rgb":[225,103,149]},
+    {"code":"H07","name":"Purple","rgb":[107,59,129]},
+    {"code":"H08","name":"Blue","rgb":[39,79,143]},
+    {"code":"H09","name":"Light Blue","rgb":[84,165,204]},
+    {"code":"H10","name":"Green","rgb":[41,130,73]},
+    {"code":"H11","name":"Light Green","rgb":[102,173,75]},
+    {"code":"H12","name":"Brown","rgb":[102,64,47]},
+    {"code":"H13","name":"Light Brown","rgb":[164,107,72]},
+    {"code":"H17","name":"Grey","rgb":[118,122,120]},
+    {"code":"H18","name":"Black","rgb":[31,34,36]},
+    {"code":"H20","name":"Reddish Brown","rgb":[139,68,46]},
+    {"code":"H21","name":"Light Pink","rgb":[242,179,190]},
+    {"code":"H22","name":"Burgundy","rgb":[117,42,57]},
+    {"code":"H26","name":"Flesh","rgb":[236,181,148]},
+    {"code":"H27","name":"Beige","rgb":[216,191,153]},
+    {"code":"H28","name":"Dark Green","rgb":[35,83,60]},
+    {"code":"H29","name":"Claret","rgb":[125,44,83]},
+    {"code":"H30","name":"Turquoise","rgb":[32,150,151]},
+    {"code":"H31","name":"Neon Green","rgb":[134,192,61]},
+    {"code":"H32","name":"Neon Pink","rgb":[234,74,134]},
+    {"code":"H36","name":"Neon Orange","rgb":[244,116,42]},
+    {"code":"H44","name":"Pastel Blue","rgb":[145,202,218]},
+    {"code":"H45","name":"Pastel Purple","rgb":[179,145,190]}
+  ]
+}

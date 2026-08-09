@@ -1,0 +1,33 @@
+{
+  "brand": "Perler",
+  "colors": [
+    {"code":"P01","name":"White","rgb":[245,245,240]},
+    {"code":"P02","name":"Cream","rgb":[255,244,188]},
+    {"code":"P03","name":"Yellow","rgb":[255,218,48]},
+    {"code":"P04","name":"Orange","rgb":[241,108,34]},
+    {"code":"P05","name":"Red","rgb":[196,43,45]},
+    {"code":"P06","name":"Bubblegum","rgb":[238,113,163]},
+    {"code":"P07","name":"Purple","rgb":[101,59,135]},
+    {"code":"P08","name":"Dark Blue","rgb":[38,66,132]},
+    {"code":"P09","name":"Light Blue","rgb":[70,161,206]},
+    {"code":"P10","name":"Green","rgb":[41,137,75]},
+    {"code":"P11","name":"Light Green","rgb":[92,181,91]},
+    {"code":"P12","name":"Brown","rgb":[100,63,49]},
+    {"code":"P13","name":"Sand","rgb":[215,176,126]},
+    {"code":"P14","name":"Tan","rgb":[190,139,94]},
+    {"code":"P15","name":"Blush","rgb":[242,183,154]},
+    {"code":"P16","name":"Grey","rgb":[121,126,123]},
+    {"code":"P17","name":"Light Grey","rgb":[190,192,187]},
+    {"code":"P18","name":"Black","rgb":[35,37,40]},
+    {"code":"P19","name":"Pearl Coral","rgb":[238,101,93]},
+    {"code":"P20","name":"Turquoise","rgb":[42,167,163]},
+    {"code":"P21","name":"Neon Green","rgb":[121,196,65]},
+    {"code":"P22","name":"Magenta","rgb":[178,52,119]},
+    {"code":"P23","name":"Navy","rgb":[35,48,86]},
+    {"code":"P24","name":"Toasted Marshmallow","rgb":[224,204,176]},
+    {"code":"P25","name":"Dark Green","rgb":[28,86,61]},
+    {"code":"P26","name":"Plum","rgb":[92,47,77]},
+    {"code":"P27","name":"Salmon","rgb":[239,130,110]},
+    {"code":"P28","name":"Sky","rgb":[151,206,224]}
+  ]
+}
