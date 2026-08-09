@@ -15,7 +15,7 @@
 - Perler、Hama、Artkal 三套品牌色库
 - LAB 色彩空间匹配、最大颜色数限制
 - 可选 Floyd–Steinberg 误差扩散抖动
-- CustomPainter 高性能网格预览、缩放查看，可开关色号图层
+- CustomPainter 高性能网格预览，支持双指缩放及悬浮加减按钮，可开关色号图层
 - 单格/多格选择、选择同色及自适应全色对比表替色；多个当前色号可同时标注
 - 颜色编号与用量统计
 - 导出含/不含网格及色号的高分辨率 JPG
@@ -87,12 +87,12 @@ Release 构建必须提供上述正式签名配置；缺少 `key.properties` 时
 
 `.github/workflows/release.yml` 支持两种触发方式：
 
-- 推送 `v` 开头的标签，例如 `git tag v1.2.1 && git push origin v1.2.1`。构建完成后会自动创建 GitHub Release，并附加 Android APK 和 Windows x64 便携 ZIP。
+- 推送 `v` 开头的标签，例如 `git tag v1.2.2 && git push origin v1.2.2`。构建完成后会自动创建 GitHub Release，并附加 Android APK 和 Windows x64 便携 ZIP。
 - 在 GitHub 的 Actions 页面手动运行 **Build releases**。手动运行不会创建 Release，APK 和 Windows ZIP 可从该次运行的 Artifacts 下载。
 
-以标签 `v1.2.1` 为例，发布文件名为：
+以标签 `v1.2.2` 为例，发布文件名为：
 
-- Android：`PindouStudio-v1.2.1-android.apk`
-- Windows：`PindouStudio-v1.2.1-windows-x64.zip`
+- Android：`PindouStudio-v1.2.2-android.apk`
+- Windows：`PindouStudio-v1.2.2-windows-x64.zip`
 
 Windows 产物是包含 DLL 和 `data` 目录的便携压缩包，解压后运行其中的 `PindouStudio.exe`。

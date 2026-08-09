@@ -812,15 +812,27 @@ class _PatternView extends StatefulWidget {
   State<_PatternView> createState() => _PatternViewState();
 }
 
-class _PatternViewState extends State<_PatternView> {
+class _PatternViewState extends State<_PatternView>
+    with SingleTickerProviderStateMixin {
+  static const _minimumScale = 0.75;
+  static const _maximumScale = 12.0;
+  static const _zoomStep = 1.25;
+
   late final TransformationController _transformationController;
+  late final AnimationController _zoomAnimationController;
+  Animation<Matrix4>? _zoomAnimation;
   double _viewScale = 1;
+  Size _viewportSize = Size.zero;
 
   @override
   void initState() {
     super.initState();
     _transformationController = TransformationController()
       ..addListener(_handleTransformation);
+    _zoomAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    )..addListener(_handleZoomAnimation);
   }
 
   void _handleTransformation() {
@@ -829,10 +841,57 @@ class _PatternViewState extends State<_PatternView> {
     setState(() => _viewScale = nextScale);
   }
 
+  void _handleZoomAnimation() {
+    final animation = _zoomAnimation;
+    if (animation == null) return;
+    _transformationController.value = animation.value;
+  }
+
+  void _stopZoomAnimation() {
+    if (!_zoomAnimationController.isAnimating) return;
+    _zoomAnimationController.stop();
+    _zoomAnimation = null;
+  }
+
+  void _zoomBy(double factor) {
+    if (_viewportSize.isEmpty) return;
+    _stopZoomAnimation();
+    final currentScale = _transformationController.value.getMaxScaleOnAxis();
+    final targetScale = (currentScale * factor)
+        .clamp(_minimumScale, _maximumScale)
+        .toDouble();
+    if ((targetScale - currentScale).abs() < 0.0001) return;
+
+    final viewportCenter = _viewportSize.center(Offset.zero);
+    final sceneCenter = _transformationController.toScene(viewportCenter);
+    final targetMatrix = Matrix4.identity()
+      ..translateByDouble(
+        viewportCenter.dx - sceneCenter.dx * targetScale,
+        viewportCenter.dy - sceneCenter.dy * targetScale,
+        0,
+        1,
+      )
+      ..scaleByDouble(targetScale, targetScale, targetScale, 1);
+    _zoomAnimation =
+        Matrix4Tween(
+          begin: _transformationController.value.clone(),
+          end: targetMatrix,
+        ).animate(
+          CurvedAnimation(
+            parent: _zoomAnimationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+    _zoomAnimationController.forward(from: 0);
+  }
+
   @override
   void dispose() {
     _transformationController
       ..removeListener(_handleTransformation)
+      ..dispose();
+    _zoomAnimationController
+      ..removeListener(_handleZoomAnimation)
       ..dispose();
     super.dispose();
   }
@@ -848,6 +907,7 @@ class _PatternViewState extends State<_PatternView> {
             padding: const EdgeInsets.all(18),
             child: LayoutBuilder(
               builder: (context, constraints) {
+                _viewportSize = constraints.biggest;
                 final aspect = pattern.width / pattern.height;
                 var width = constraints.maxWidth;
                 var height = width / aspect;
@@ -857,9 +917,10 @@ class _PatternViewState extends State<_PatternView> {
                 }
                 return InteractiveViewer(
                   transformationController: _transformationController,
-                  minScale: 0.75,
-                  maxScale: 12,
+                  minScale: _minimumScale,
+                  maxScale: _maximumScale,
                   boundaryMargin: const EdgeInsets.all(80),
+                  onInteractionStart: (_) => _stopZoomAnimation(),
                   child: Center(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -919,6 +980,7 @@ class _PatternViewState extends State<_PatternView> {
               ),
             ),
           ),
+        Positioned(left: 12, bottom: 12, child: _buildZoomControls(context)),
         Positioned(
           right: 12,
           bottom: 12,
@@ -946,6 +1008,50 @@ class _PatternViewState extends State<_PatternView> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildZoomControls(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final canZoomIn = _viewScale < _maximumScale - 0.001;
+    final canZoomOut = _viewScale > _minimumScale + 0.001;
+    return Material(
+      color: colorScheme.surface.withValues(alpha: 0.94),
+      elevation: 5,
+      shadowColor: Colors.black.withValues(alpha: 0.26),
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: const ValueKey('zoom-in-button'),
+            tooltip: '放大图案',
+            onPressed: canZoomIn ? () => _zoomBy(_zoomStep) : null,
+            icon: const Icon(Icons.add_rounded),
+          ),
+          Container(
+            key: const ValueKey('zoom-level-label'),
+            constraints: const BoxConstraints(minWidth: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+            alignment: Alignment.center,
+            child: Text(
+              '${(_viewScale * 100).round()}%',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('zoom-out-button'),
+            tooltip: '缩小图案',
+            onPressed: canZoomOut ? () => _zoomBy(1 / _zoomStep) : null,
+            icon: const Icon(Icons.remove_rounded),
+          ),
+        ],
+      ),
     );
   }
 

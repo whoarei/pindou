@@ -156,6 +156,25 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final viewerFinder = find.byType(InteractiveViewer);
+    final viewer = tester.widget<InteractiveViewer>(viewerFinder);
+    final viewportCenter = tester.getSize(viewerFinder).center(Offset.zero);
+    final sceneCenterBefore = viewer.transformationController!.toScene(
+      viewportCenter,
+    );
+    expect(find.text('100%'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('zoom-in-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('125%'), findsOneWidget);
+    final sceneCenterAfterZoomIn = viewer.transformationController!.toScene(
+      viewportCenter,
+    );
+    expect(sceneCenterAfterZoomIn.dx, closeTo(sceneCenterBefore.dx, 0.001));
+    expect(sceneCenterAfterZoomIn.dy, closeTo(sceneCenterBefore.dy, 0.001));
+    await tester.tap(find.byKey(const ValueKey('zoom-out-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('100%'), findsOneWidget);
+
     await tester.tap(find.byKey(const ValueKey('toggle-color-codes')));
     await tester.pump();
     expect(controller.state.showColorCodes, isFalse);
