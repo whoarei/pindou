@@ -34,6 +34,10 @@ class Pattern {
         .where((index) => index >= 0 && index < colorIndices.length)
         .toSet();
     if (selected.isEmpty) return this;
+    final changesAnyCell = selected.any(
+      (cell) => colors[colorIndices[cell]].code != replacement.code,
+    );
+    if (!changesAnyCell) return this;
 
     final expandedColors = List<BeadColor>.of(colors);
     var replacementIndex = expandedColors.indexWhere(

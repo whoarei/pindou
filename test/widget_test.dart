@@ -1,6 +1,7 @@
 import 'package:pindou_studio/app.dart';
 import 'package:pindou_studio/features/editor/editor_controller.dart';
 import 'package:pindou_studio/features/editor/editor_state.dart';
+import 'package:pindou_studio/features/editor/pattern_painter.dart';
 import 'package:pindou_studio/models/bead_color.dart';
 import 'package:pindou_studio/models/pattern.dart';
 import 'package:pindou_studio/services/palette_service.dart';
@@ -235,6 +236,110 @@ void main() {
     expect(controller.state.pattern!.colors, [red, blue, green]);
     expect(controller.state.pattern!.colorIndices, [2, 2, 0, 1]);
     expect(controller.state.selectedCells, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('paints a continuous stroke and supports undo and redo', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const red = BeadColor(
+      code: 'P01',
+      name: 'Red',
+      red: 225,
+      green: 35,
+      blue: 45,
+    );
+    const blue = BeadColor(
+      code: 'P02',
+      name: 'Blue',
+      red: 30,
+      green: 55,
+      blue: 220,
+    );
+    final controller = _PresetEditorController(
+      const EditorState(
+        palettes: [
+          BeadPalette(brand: 'Test', colors: [red, blue]),
+        ],
+        selectedBrand: 'Test',
+        brushColorCode: 'P02',
+        pattern: Pattern(
+          width: 4,
+          height: 4,
+          colorIndices: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          colors: [red],
+          counts: [16],
+        ),
+        isLoadingPalettes: false,
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [editorProvider.overrideWith((ref) => controller)],
+        child: const BeadPatternApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('brush-tool')));
+    await tester.pump();
+
+    final patternPaint = find.byWidgetPredicate(
+      (widget) => widget is CustomPaint && widget.painter is PatternPainter,
+    );
+    final rect = tester.getRect(patternPaint);
+    final gesture = await tester.startGesture(
+      Offset(rect.left + rect.width / 8, rect.top + rect.height / 8),
+    );
+    await gesture.moveTo(
+      Offset(rect.right - rect.width / 8, rect.bottom - rect.height / 8),
+    );
+    await gesture.up();
+    await tester.pump();
+
+    String colorCodeAt(int cell) {
+      final pattern = controller.state.pattern!;
+      return pattern.colors[pattern.colorIndices[cell]].code;
+    }
+
+    expect([0, 5, 10, 15].map(colorCodeAt), everyElement('P02'));
+    expect(controller.state.canUndo, isTrue);
+    expect(controller.state.canRedo, isFalse);
+
+    await tester.tap(find.byKey(const ValueKey('undo-pattern-edit')));
+    await tester.pump();
+    expect(List.generate(16, colorCodeAt), everyElement('P01'));
+    expect(controller.state.canRedo, isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('redo-pattern-edit')));
+    await tester.pump();
+    expect([0, 5, 10, 15].map(colorCodeAt), everyElement('P02'));
+
+    await tester.tap(find.byKey(const ValueKey('undo-pattern-edit')));
+    await tester.pump();
+    final firstPointer = await tester.startGesture(
+      Offset(rect.left + rect.width / 8, rect.top + rect.height / 8),
+      pointer: 7,
+    );
+    final secondPointer = await tester.startGesture(
+      Offset(rect.right - rect.width / 8, rect.bottom - rect.height / 8),
+      pointer: 8,
+    );
+    await firstPointer.moveTo(rect.center);
+    await secondPointer.moveTo(Offset(rect.center.dx, rect.bottom));
+    await firstPointer.up();
+    await secondPointer.up();
+    await tester.pump();
+    expect(colorCodeAt(0), 'P02');
+    expect(
+      List.generate(16, colorCodeAt).where((code) => code == 'P02'),
+      hasLength(1),
+    );
     expect(tester.takeException(), isNull);
   });
 }

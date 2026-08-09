@@ -40,6 +40,8 @@ class ProjectCodec {
         'showGrid': state.showGrid,
         'showColorCodes': state.showColorCodes,
         'isColorEditing': state.isColorEditing,
+        'editTool': state.editTool.name,
+        'brushColorCode': state.brushColorCode,
         'selectedCells': selectedCells,
       },
       'pattern': pattern == null
@@ -127,6 +129,20 @@ class ProjectCodec {
       editor['maximumColors'],
       'maximumColors',
     ).clamp(1, selectedPalette.colors.length);
+    final rawEditTool = editor['editTool'];
+    final editTool = pattern == null
+        ? EditorTool.pan
+        : EditorTool.values
+                  .where((tool) => tool.name == rawEditTool)
+                  .firstOrNull ??
+              (_asBool(editor['isColorEditing'], false)
+                  ? EditorTool.select
+                  : EditorTool.pan);
+    final requestedBrushCode = editor['brushColorCode'] as String?;
+    final brushColorCode = selectedPalette.colors
+        .where((color) => color.code == requestedBrushCode)
+        .firstOrNull
+        ?.code;
     return EditorState(
       palettes: palettes,
       selectedBrand: selectedPalette.brand,
@@ -145,9 +161,11 @@ class ProjectCodec {
       dither: _asBool(editor['dither'], false),
       showGrid: _asBool(editor['showGrid'], true),
       showColorCodes: _asBool(editor['showColorCodes'], true),
-      isColorEditing:
-          pattern != null && _asBool(editor['isColorEditing'], false),
-      selectedCells: Set<int>.unmodifiable(selectedCells),
+      editTool: editTool,
+      brushColorCode: brushColorCode ?? selectedPalette.colors.first.code,
+      selectedCells: Set<int>.unmodifiable(
+        editTool == EditorTool.select ? selectedCells : const <int>{},
+      ),
       pattern: pattern,
       isLoadingPalettes: false,
     );

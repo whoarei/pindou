@@ -823,6 +823,12 @@ class _PatternViewState extends State<_PatternView>
   Animation<Matrix4>? _zoomAnimation;
   double _viewScale = 1;
   Size _viewportSize = Size.zero;
+  Rect _patternRect = Rect.zero;
+  final Set<int> _activePointers = <int>{};
+  final Set<int> _brushStroke = <int>{};
+  int? _brushPointer;
+  int? _lastBrushCell;
+  bool _suppressBrushUntilPointersUp = false;
 
   @override
   void initState() {
@@ -897,114 +903,179 @@ class _PatternViewState extends State<_PatternView>
   }
 
   @override
+  void didUpdateWidget(covariant _PatternView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state.editTool == EditorTool.brush &&
+        widget.state.editTool != EditorTool.brush) {
+      _brushStroke.clear();
+      _brushPointer = null;
+      _lastBrushCell = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = widget.state;
     final pattern = state.pattern!;
-    return Stack(
+    return Column(
       children: [
-        Positioned.fill(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                _viewportSize = constraints.biggest;
-                final aspect = pattern.width / pattern.height;
-                var width = constraints.maxWidth;
-                var height = width / aspect;
-                if (height > constraints.maxHeight) {
-                  height = constraints.maxHeight;
-                  width = height * aspect;
-                }
-                return InteractiveViewer(
-                  transformationController: _transformationController,
-                  minScale: _minimumScale,
-                  maxScale: _maximumScale,
-                  boundaryMargin: const EdgeInsets.all(80),
-                  onInteractionStart: (_) => _stopZoomAnimation(),
-                  child: Center(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.18),
-                            blurRadius: 18,
-                            offset: const Offset(0, 7),
-                          ),
-                        ],
-                      ),
-                      child: SizedBox(
-                        width: width,
-                        height: height,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTapUp: state.isColorEditing
-                              ? (details) => _toggleCell(
-                                  details.localPosition,
-                                  Size(width, height),
-                                  pattern,
-                                )
-                              : null,
-                          child: CustomPaint(
-                            painter: PatternPainter(
-                              pattern: pattern,
-                              showGrid: state.showGrid,
-                              showColorCodes: state.showColorCodes,
-                              selectedCells: state.selectedCells,
-                              viewScale: _viewScale,
-                              selectionColor: Theme.of(
-                                context,
-                              ).colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: _EditorToolbar(
+              tool: state.editTool,
+              selectedCount: state.selectedCells.length,
+              brushColor: state.selectedBrushColor,
+              canUndo: state.canUndo,
+              canRedo: state.canRedo,
+              onToolChanged: _setEditorTool,
+              onSelectMatching: widget.controller.selectMatchingColor,
+              onClear: widget.controller.clearSelectedCells,
+              onReplace: _showSelectionColorPicker,
+              onSelectBrushColor: _showBrushColorPicker,
+              onUndo: widget.controller.undoPatternEdit,
+              onRedo: widget.controller.redoPatternEdit,
             ),
           ),
         ),
-        if (state.isColorEditing)
-          Positioned(
-            left: 12,
-            top: 12,
-            right: 12,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: _SelectionToolbar(
-                selectedCount: state.selectedCells.length,
-                onSelectMatching: widget.controller.selectMatchingColor,
-                onClear: widget.controller.clearSelectedCells,
-                onReplace: _showColorPicker,
+        Expanded(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      _viewportSize = constraints.biggest;
+                      final aspect = pattern.width / pattern.height;
+                      var width = constraints.maxWidth;
+                      var height = width / aspect;
+                      if (height > constraints.maxHeight) {
+                        height = constraints.maxHeight;
+                        width = height * aspect;
+                      }
+                      _patternRect = Rect.fromLTWH(
+                        (constraints.maxWidth - width) / 2,
+                        (constraints.maxHeight - height) / 2,
+                        width,
+                        height,
+                      );
+                      return Listener(
+                        key: const ValueKey('pattern-interaction-surface'),
+                        behavior: HitTestBehavior.opaque,
+                        onPointerDown: _handlePointerDown,
+                        onPointerMove: _handlePointerMove,
+                        onPointerUp: _handlePointerUp,
+                        onPointerCancel: _handlePointerCancel,
+                        child: InteractiveViewer(
+                          transformationController: _transformationController,
+                          minScale: _minimumScale,
+                          maxScale: _maximumScale,
+                          boundaryMargin: const EdgeInsets.all(80),
+                          panEnabled:
+                              state.editTool != EditorTool.brush ||
+                              _activePointers.length >= 2,
+                          scaleEnabled: true,
+                          onInteractionStart: (_) => _stopZoomAnimation(),
+                          child: Center(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.18),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 7),
+                                  ),
+                                ],
+                              ),
+                              child: SizedBox(
+                                width: width,
+                                height: height,
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTapUp: state.editTool == EditorTool.select
+                                      ? (details) => _toggleCell(
+                                          details.localPosition,
+                                          Size(width, height),
+                                          pattern,
+                                        )
+                                      : null,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      CustomPaint(
+                                        painter: PatternPainter(
+                                          pattern: pattern,
+                                          showGrid: state.showGrid,
+                                          showColorCodes: state.showColorCodes,
+                                          selectedCells: state.selectedCells,
+                                          viewScale: _viewScale,
+                                          selectionColor: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                        ),
+                                      ),
+                                      IgnorePointer(
+                                        child: CustomPaint(
+                                          painter: BrushStrokePainter(
+                                            pattern: pattern,
+                                            cells: Set<int>.unmodifiable(
+                                              _brushStroke,
+                                            ),
+                                            color:
+                                                state
+                                                    .selectedBrushColor
+                                                    ?.color ??
+                                                Colors.transparent,
+                                            viewScale: _viewScale,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
-          ),
-        Positioned(left: 12, bottom: 12, child: _buildZoomControls(context)),
-        Positioned(
-          right: 12,
-          bottom: 12,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.surface.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant,
+              Positioned(
+                left: 12,
+                bottom: 12,
+                child: _buildZoomControls(context),
               ),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.pinch_rounded, size: 15),
-                  SizedBox(width: 5),
-                  Text('缩放查看', style: TextStyle(fontSize: 12)),
-                ],
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surface.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.pinch_rounded, size: 15),
+                        SizedBox(width: 5),
+                        Text('缩放查看', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ],
@@ -1062,7 +1133,123 @@ class _PatternViewState extends State<_PatternView>
     widget.controller.toggleSelectedCell(y * pattern.width + x);
   }
 
-  Future<void> _showColorPicker() async {
+  void _handlePointerDown(PointerDownEvent event) {
+    _activePointers.add(event.pointer);
+    if (widget.state.editTool == EditorTool.brush) {
+      _stopZoomAnimation();
+      if (_activePointers.length == 1 && !_suppressBrushUntilPointersUp) {
+        _brushPointer = event.pointer;
+        _addBrushPosition(event.localPosition);
+      } else if (_activePointers.length >= 2) {
+        _commitBrushStroke();
+        _brushPointer = null;
+        _lastBrushCell = null;
+        _suppressBrushUntilPointersUp = true;
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (widget.state.editTool != EditorTool.brush ||
+        event.pointer != _brushPointer ||
+        _activePointers.length != 1 ||
+        _suppressBrushUntilPointersUp) {
+      return;
+    }
+    _addBrushPosition(event.localPosition);
+  }
+
+  void _handlePointerUp(PointerUpEvent event) => _finishPointer(event.pointer);
+
+  void _handlePointerCancel(PointerCancelEvent event) =>
+      _finishPointer(event.pointer);
+
+  void _finishPointer(int pointer) {
+    if (pointer == _brushPointer) _commitBrushStroke();
+    _activePointers.remove(pointer);
+    if (_activePointers.isEmpty) _suppressBrushUntilPointersUp = false;
+    if (pointer == _brushPointer) {
+      _brushPointer = null;
+      _lastBrushCell = null;
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _addBrushPosition(Offset viewportPosition) {
+    final scenePosition = _transformationController.toScene(viewportPosition);
+    final cell = _cellAtScenePosition(scenePosition);
+    if (cell == null) {
+      _lastBrushCell = null;
+      return;
+    }
+    final previous = _lastBrushCell;
+    if (previous == null) {
+      _brushStroke.add(cell);
+    } else if (previous != cell) {
+      _brushStroke.addAll(_cellsOnLine(previous, cell, widget.state.pattern!));
+    }
+    _lastBrushCell = cell;
+    if (mounted) setState(() {});
+  }
+
+  int? _cellAtScenePosition(Offset position) {
+    final pattern = widget.state.pattern!;
+    if (!_patternRect.contains(position)) return null;
+    final x =
+        ((position.dx - _patternRect.left) / _patternRect.width * pattern.width)
+            .floor();
+    final y =
+        ((position.dy - _patternRect.top) /
+                _patternRect.height *
+                pattern.height)
+            .floor();
+    if (x < 0 || x >= pattern.width || y < 0 || y >= pattern.height) {
+      return null;
+    }
+    return y * pattern.width + x;
+  }
+
+  Iterable<int> _cellsOnLine(int from, int to, Pattern pattern) sync* {
+    var x0 = from % pattern.width;
+    var y0 = from ~/ pattern.width;
+    final x1 = to % pattern.width;
+    final y1 = to ~/ pattern.width;
+    final dx = (x1 - x0).abs();
+    final sx = x0 < x1 ? 1 : -1;
+    final dy = -(y1 - y0).abs();
+    final sy = y0 < y1 ? 1 : -1;
+    var error = dx + dy;
+    while (true) {
+      yield y0 * pattern.width + x0;
+      if (x0 == x1 && y0 == y1) break;
+      final twiceError = 2 * error;
+      if (twiceError >= dy) {
+        error += dy;
+        x0 += sx;
+      }
+      if (twiceError <= dx) {
+        error += dx;
+        y0 += sy;
+      }
+    }
+  }
+
+  void _commitBrushStroke() {
+    if (_brushStroke.isEmpty) return;
+    final cells = Set<int>.of(_brushStroke);
+    _brushStroke.clear();
+    widget.controller.paintCells(cells);
+  }
+
+  void _setEditorTool(EditorTool tool) {
+    if (widget.state.editTool == EditorTool.brush && tool != EditorTool.brush) {
+      _commitBrushStroke();
+    }
+    widget.controller.setEditorTool(tool);
+  }
+
+  Future<void> _showSelectionColorPicker() async {
     if (widget.state.selectedCells.isEmpty) return;
     final palette = widget.state.selectedPalette;
     final pattern = widget.state.pattern;
@@ -1076,24 +1263,60 @@ class _PatternViewState extends State<_PatternView>
       builder: (context) => _ColorPickerDialog(
         palette: palette,
         currentColorCodes: currentColorCodes,
+        helperText: '对比全部颜色，点击目标色号后立即替换',
+        currentDescription: '当前选区的 ${currentColorCodes.length} 个色号',
+        currentMarkerLabel: '当前选区颜色',
       ),
     );
     if (selected != null) widget.controller.replaceSelectedColor(selected);
   }
+
+  Future<void> _showBrushColorPicker() async {
+    final palette = widget.state.selectedPalette;
+    final brushColor = widget.state.selectedBrushColor;
+    if (palette == null || brushColor == null) return;
+    final selected = await showDialog<BeadColor>(
+      context: context,
+      builder: (context) => _ColorPickerDialog(
+        palette: palette,
+        currentColorCodes: {brushColor.code},
+        helperText: '对比全部颜色，点击一个色号作为画笔颜色',
+        currentDescription: '当前画笔色号 ${brushColor.code}',
+        currentMarkerLabel: '当前画笔颜色',
+      ),
+    );
+    if (selected != null) widget.controller.setBrushColor(selected);
+  }
 }
 
-class _SelectionToolbar extends StatelessWidget {
-  const _SelectionToolbar({
+class _EditorToolbar extends StatelessWidget {
+  const _EditorToolbar({
+    required this.tool,
     required this.selectedCount,
+    required this.brushColor,
+    required this.canUndo,
+    required this.canRedo,
+    required this.onToolChanged,
     required this.onSelectMatching,
     required this.onClear,
     required this.onReplace,
+    required this.onSelectBrushColor,
+    required this.onUndo,
+    required this.onRedo,
   });
 
+  final EditorTool tool;
   final int selectedCount;
+  final BeadColor? brushColor;
+  final bool canUndo;
+  final bool canRedo;
+  final ValueChanged<EditorTool> onToolChanged;
   final VoidCallback onSelectMatching;
   final VoidCallback onClear;
   final VoidCallback onReplace;
+  final VoidCallback onSelectBrushColor;
+  final VoidCallback onUndo;
+  final VoidCallback onRedo;
 
   @override
   Widget build(BuildContext context) {
@@ -1111,34 +1334,87 @@ class _SelectionToolbar extends StatelessWidget {
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Icon(
-                Icons.touch_app_rounded,
-                size: 19,
-                color: Theme.of(context).colorScheme.primary,
+              IconButton(
+                key: const ValueKey('pan-tool'),
+                tooltip: '手掌：拖动和缩放图案',
+                isSelected: tool == EditorTool.pan,
+                onPressed: () => onToolChanged(EditorTool.pan),
+                icon: const Icon(Icons.pan_tool_outlined),
+                selectedIcon: const Icon(Icons.pan_tool_rounded),
               ),
-              Text(
-                selectedCount == 0 ? '点击色块进行多选' : '已选 $selectedCount 个色块',
-                style: const TextStyle(fontWeight: FontWeight.w800),
+              IconButton(
+                key: const ValueKey('selection-tool'),
+                tooltip: '选择：点击一个或多个色块',
+                isSelected: tool == EditorTool.select,
+                onPressed: () => onToolChanged(EditorTool.select),
+                icon: const Icon(Icons.select_all_outlined),
+                selectedIcon: const Icon(Icons.select_all_rounded),
               ),
-              if (selectedCount > 0) ...[
+              IconButton(
+                key: const ValueKey('brush-tool'),
+                tooltip: '画笔：点击或滑动修改色块',
+                isSelected: tool == EditorTool.brush,
+                onPressed: () => onToolChanged(EditorTool.brush),
+                icon: const Icon(Icons.brush_outlined),
+                selectedIcon: const Icon(Icons.brush_rounded),
+              ),
+              const SizedBox(width: 2),
+              if (tool == EditorTool.select) ...[
+                Text(
+                  selectedCount == 0 ? '点击色块进行多选' : '已选 $selectedCount 个色块',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                if (selectedCount > 0) ...[
+                  TextButton.icon(
+                    key: const ValueKey('select-matching-color'),
+                    onPressed: onSelectMatching,
+                    icon: const Icon(Icons.select_all_rounded, size: 18),
+                    label: const Text('选择同色'),
+                  ),
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('replace-selected-color'),
+                    onPressed: onReplace,
+                    icon: const Icon(Icons.palette_outlined, size: 18),
+                    label: const Text('更改色号'),
+                  ),
+                  IconButton(
+                    tooltip: '清除选择',
+                    onPressed: onClear,
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ] else if (tool == EditorTool.brush && brushColor != null) ...[
                 TextButton.icon(
-                  key: const ValueKey('select-matching-color'),
-                  onPressed: onSelectMatching,
-                  icon: const Icon(Icons.select_all_rounded, size: 18),
-                  label: const Text('选择同色'),
+                  key: const ValueKey('select-brush-color'),
+                  onPressed: onSelectBrushColor,
+                  icon: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: brushColor!.color,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ),
+                  label: Text('画笔 ${brushColor!.code}'),
                 ),
-                FilledButton.tonalIcon(
-                  key: const ValueKey('replace-selected-color'),
-                  onPressed: onReplace,
-                  icon: const Icon(Icons.palette_outlined, size: 18),
-                  label: const Text('更改色号'),
-                ),
-                IconButton(
-                  tooltip: '清除选择',
-                  onPressed: onClear,
-                  icon: const Icon(Icons.close_rounded),
-                ),
+                const Text('单指绘制 · 双指缩放'),
               ],
+              const SizedBox(width: 2),
+              IconButton(
+                key: const ValueKey('undo-pattern-edit'),
+                tooltip: '撤销',
+                onPressed: canUndo ? onUndo : null,
+                icon: const Icon(Icons.undo_rounded),
+              ),
+              IconButton(
+                key: const ValueKey('redo-pattern-edit'),
+                tooltip: '重做',
+                onPressed: canRedo ? onRedo : null,
+                icon: const Icon(Icons.redo_rounded),
+              ),
             ],
           ),
         ),
@@ -1151,10 +1427,16 @@ class _ColorPickerDialog extends StatelessWidget {
   const _ColorPickerDialog({
     required this.palette,
     required this.currentColorCodes,
+    required this.helperText,
+    required this.currentDescription,
+    required this.currentMarkerLabel,
   });
 
   final BeadPalette palette;
   final Set<String> currentColorCodes;
+  final String helperText;
+  final String currentDescription;
+  final String currentMarkerLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1166,7 +1448,7 @@ class _ColorPickerDialog extends StatelessWidget {
           Text('选择 ${palette.brand} 色号'),
           const SizedBox(height: 4),
           Text(
-            '对比全部颜色，点击目标色号后立即替换',
+            helperText,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.normal,
@@ -1215,7 +1497,7 @@ class _ColorPickerDialog extends StatelessWidget {
                       const SizedBox(width: 7),
                       Expanded(
                         child: Text(
-                          '特殊边框：当前选区的 ${currentColorCodes.length} 个色号',
+                          '特殊边框：$currentDescription',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.labelMedium,
@@ -1254,6 +1536,7 @@ class _ColorPickerDialog extends StatelessWidget {
                           return _PaletteColorCell(
                             color: color,
                             isCurrent: currentColorCodes.contains(color.code),
+                            currentMarkerLabel: currentMarkerLabel,
                             onTap: () => Navigator.of(context).pop(color),
                           );
                         },
@@ -1280,11 +1563,13 @@ class _PaletteColorCell extends StatelessWidget {
   const _PaletteColorCell({
     required this.color,
     required this.isCurrent,
+    required this.currentMarkerLabel,
     required this.onTap,
   });
 
   final BeadColor color;
   final bool isCurrent;
+  final String currentMarkerLabel;
   final VoidCallback onTap;
 
   @override
@@ -1296,9 +1581,11 @@ class _PaletteColorCell extends StatelessWidget {
     return Semantics(
       button: true,
       selected: isCurrent,
-      label: '${color.code} ${color.name}${isCurrent ? '，当前选区颜色' : ''}',
+      label:
+          '${color.code} ${color.name}${isCurrent ? '，$currentMarkerLabel' : ''}',
       child: Tooltip(
-        message: '${color.code} · ${color.name}${isCurrent ? '（当前选区）' : ''}',
+        message:
+            '${color.code} · ${color.name}${isCurrent ? '（$currentMarkerLabel）' : ''}',
         child: AnimatedContainer(
           key: ValueKey('palette-color-${color.code}'),
           duration: const Duration(milliseconds: 160),

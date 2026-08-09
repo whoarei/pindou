@@ -158,3 +158,52 @@ class PatternPainter extends CustomPainter {
         !setEquals(oldDelegate.selectedCells, selectedCells);
   }
 }
+
+class BrushStrokePainter extends CustomPainter {
+  const BrushStrokePainter({
+    required this.pattern,
+    required this.cells,
+    required this.color,
+    required this.viewScale,
+  });
+
+  final Pattern pattern;
+  final Set<int> cells;
+  final Color color;
+  final double viewScale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (cells.isEmpty) return;
+    final cellWidth = size.width / pattern.width;
+    final cellHeight = size.height / pattern.height;
+    final fill = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final stroke = Paint()
+      ..color = Colors.white.withValues(alpha: 0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8 / viewScale.clamp(1, 12);
+    for (final index in cells) {
+      if (index < 0 || index >= pattern.colorIndices.length) continue;
+      final x = index % pattern.width;
+      final y = index ~/ pattern.width;
+      final rect = Rect.fromLTWH(
+        x * cellWidth,
+        y * cellHeight,
+        cellWidth,
+        cellHeight,
+      );
+      canvas.drawRect(rect, fill);
+      canvas.drawRect(rect.deflate(stroke.strokeWidth / 2), stroke);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant BrushStrokePainter oldDelegate) {
+    return oldDelegate.pattern != pattern ||
+        oldDelegate.color != color ||
+        oldDelegate.viewScale != viewScale ||
+        !setEquals(oldDelegate.cells, cells);
+  }
+}

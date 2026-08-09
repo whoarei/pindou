@@ -46,7 +46,8 @@ void main() {
       dither: true,
       showGrid: false,
       showColorCodes: true,
-      isColorEditing: true,
+      editTool: EditorTool.brush,
+      brushColorCode: 'P02',
       selectedCells: const {1, 2},
       pattern: const Pattern(
         width: 2,
@@ -76,7 +77,9 @@ void main() {
     expect(restored.showGrid, isFalse);
     expect(restored.showColorCodes, isTrue);
     expect(restored.isColorEditing, isTrue);
-    expect(restored.selectedCells, {1, 2});
+    expect(restored.editTool, EditorTool.brush);
+    expect(restored.brushColorCode, 'P02');
+    expect(restored.selectedCells, isEmpty);
     expect(restored.pattern!.colorIndices, [0, 1, 1, 0]);
     expect(restored.pattern!.counts, [2, 2]);
     expect(restored.pattern!.colors, [red, blue]);

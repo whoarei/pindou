@@ -4,6 +4,8 @@ import '../../models/bead_color.dart';
 import '../../models/crop_spec.dart';
 import '../../models/pattern.dart';
 
+enum EditorTool { pan, select, brush }
+
 @immutable
 class EditorState {
   const EditorState({
@@ -21,9 +23,12 @@ class EditorState {
     this.dither = false,
     this.showGrid = true,
     this.showColorCodes = true,
-    this.isColorEditing = false,
+    this.editTool = EditorTool.pan,
+    this.brushColorCode,
     this.selectedCells = const <int>{},
     this.pattern,
+    this.canUndo = false,
+    this.canRedo = false,
     this.isLoadingPalettes = true,
     this.isProcessing = false,
     this.isExporting = false,
@@ -46,9 +51,12 @@ class EditorState {
   final bool dither;
   final bool showGrid;
   final bool showColorCodes;
-  final bool isColorEditing;
+  final EditorTool editTool;
+  final String? brushColorCode;
   final Set<int> selectedCells;
   final Pattern? pattern;
+  final bool canUndo;
+  final bool canRedo;
   final bool isLoadingPalettes;
   final bool isProcessing;
   final bool isExporting;
@@ -65,6 +73,17 @@ class EditorState {
 
   bool get canGenerate =>
       sourceBytes != null && selectedPalette != null && !isProcessing;
+
+  bool get isColorEditing => editTool != EditorTool.pan;
+
+  BeadColor? get selectedBrushColor {
+    final palette = selectedPalette;
+    if (palette == null) return null;
+    for (final color in palette.colors) {
+      if (color.code == brushColorCode) return color;
+    }
+    return palette.colors.firstOrNull;
+  }
 
   double? get croppedAspectRatio {
     if (sourceWidth == null || sourceHeight == null) return null;
@@ -89,11 +108,14 @@ class EditorState {
     bool? dither,
     bool? showGrid,
     bool? showColorCodes,
-    bool? isColorEditing,
+    EditorTool? editTool,
+    String? brushColorCode,
     Set<int>? selectedCells,
     bool clearSelection = false,
     Pattern? pattern,
     bool clearPattern = false,
+    bool? canUndo,
+    bool? canRedo,
     bool? isLoadingPalettes,
     bool? isProcessing,
     bool? isExporting,
@@ -118,15 +140,16 @@ class EditorState {
       dither: dither ?? this.dither,
       showGrid: showGrid ?? this.showGrid,
       showColorCodes: showColorCodes ?? this.showColorCodes,
-      isColorEditing: clearPattern
-          ? false
-          : (isColorEditing ?? this.isColorEditing),
+      editTool: clearPattern ? EditorTool.pan : (editTool ?? this.editTool),
+      brushColorCode: brushColorCode ?? this.brushColorCode,
       selectedCells: Set<int>.unmodifiable(
-        clearPattern || clearSelection
+        clearPattern || clearSelection || editTool == EditorTool.brush
             ? const <int>{}
             : (selectedCells ?? this.selectedCells),
       ),
       pattern: clearPattern ? null : (pattern ?? this.pattern),
+      canUndo: clearPattern ? false : (canUndo ?? this.canUndo),
+      canRedo: clearPattern ? false : (canRedo ?? this.canRedo),
       isLoadingPalettes: isLoadingPalettes ?? this.isLoadingPalettes,
       isProcessing: isProcessing ?? this.isProcessing,
       isExporting: isExporting ?? this.isExporting,

@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import '../../engine/bead_engine.dart';
 import '../../models/bead_color.dart';
 import '../../models/crop_spec.dart';
+import '../../models/pattern.dart';
 import '../../services/palette_service.dart';
 import '../../services/project_codec.dart';
 import 'editor_state.dart';
@@ -37,6 +38,9 @@ class EditorController extends StateNotifier<EditorState> {
   File? _cachedAutosaveFile;
   bool _projectOperationInProgress = false;
   int _autosaveRevision = 0;
+  static const _historyLimit = 20;
+  final List<Pattern> _undoStack = <Pattern>[];
+  final List<Pattern> _redoStack = <Pattern>[];
 
   Future<void> initialize() async {
     try {
@@ -46,6 +50,7 @@ class EditorController extends StateNotifier<EditorState> {
         palettes: palettes,
         isLoadingPalettes: false,
         maximumColors: 16.clamp(1, palettes.first.colors.length),
+        brushColorCode: palettes.first.colors.first.code,
         clearError: true,
       );
       if (autosaveEnabled) await _restoreAutosave();
@@ -170,6 +175,7 @@ class EditorController extends StateNotifier<EditorState> {
     _updateState(
       state.copyWith(
         selectedBrand: brand,
+        brushColorCode: palette.colors.first.code,
         maximumColors: state.maximumColors.clamp(1, palette.colors.length),
         clearPattern: true,
       ),
@@ -199,13 +205,34 @@ class EditorController extends StateNotifier<EditorState> {
   }
 
   void setColorEditing(bool value) {
+    setEditorTool(value ? EditorTool.select : EditorTool.pan);
+  }
+
+  void setEditorTool(EditorTool tool) {
     if (state.pattern == null) return;
-    _updateState(state.copyWith(isColorEditing: value, clearSelection: !value));
+    _updateState(
+      state.copyWith(editTool: tool, clearSelection: tool != EditorTool.select),
+    );
+  }
+
+  void setBrushColor(BeadColor color) {
+    final palette = state.selectedPalette;
+    if (palette == null ||
+        !palette.colors.any((item) => item.code == color.code)) {
+      return;
+    }
+    _updateState(
+      state.copyWith(
+        editTool: EditorTool.brush,
+        brushColorCode: color.code,
+        clearSelection: true,
+      ),
+    );
   }
 
   void toggleSelectedCell(int index) {
     final pattern = state.pattern;
-    if (!state.isColorEditing ||
+    if (state.editTool != EditorTool.select ||
         pattern == null ||
         index < 0 ||
         index >= pattern.colorIndices.length) {
@@ -237,8 +264,44 @@ class EditorController extends StateNotifier<EditorState> {
     final pattern = state.pattern;
     if (pattern == null || state.selectedCells.isEmpty) return;
     final updated = pattern.replaceCells(state.selectedCells, color);
+    _applyPatternEdit(updated, clearSelection: true);
+  }
+
+  void paintCells(Iterable<int> cells) {
+    final pattern = state.pattern;
+    final color = state.selectedBrushColor;
+    if (pattern == null || color == null) return;
+    final updated = pattern.replaceCells(cells, color);
+    _applyPatternEdit(updated);
+  }
+
+  void undoPatternEdit() {
+    final current = state.pattern;
+    if (current == null || _undoStack.isEmpty) return;
+    final previous = _undoStack.removeLast();
+    _redoStack.add(current);
     _updateState(
-      state.copyWith(pattern: updated, clearSelection: true, clearError: true),
+      state.copyWith(
+        pattern: previous,
+        clearSelection: true,
+        canUndo: _undoStack.isNotEmpty,
+        canRedo: true,
+      ),
+    );
+  }
+
+  void redoPatternEdit() {
+    final current = state.pattern;
+    if (current == null || _redoStack.isEmpty) return;
+    final next = _redoStack.removeLast();
+    _undoStack.add(current);
+    _updateState(
+      state.copyWith(
+        pattern: next,
+        clearSelection: true,
+        canUndo: true,
+        canRedo: _redoStack.isNotEmpty,
+      ),
     );
   }
 
@@ -255,6 +318,7 @@ class EditorController extends StateNotifier<EditorState> {
     final palette = state.selectedPalette;
     if (bytes == null || palette == null || state.isProcessing) return;
 
+    _resetEditHistory();
     state = state.copyWith(
       isProcessing: true,
       clearPattern: true,
@@ -409,6 +473,7 @@ class EditorController extends StateNotifier<EditorState> {
         noticeMessage: '已恢复工程：$displayName',
         clearError: true,
       );
+      _resetEditHistory();
       _autosaveRevision++;
       await _writeAutosave(ignoreRevision: true);
       return returnPath;
@@ -427,9 +492,36 @@ class EditorController extends StateNotifier<EditorState> {
   }
 
   void _updateState(EditorState next) {
+    if (state.pattern != null && next.pattern == null) {
+      _resetEditHistory();
+    }
     state = next;
     _autosaveRevision++;
     _scheduleAutosave();
+  }
+
+  void _applyPatternEdit(Pattern updated, {bool clearSelection = false}) {
+    final current = state.pattern;
+    if (current == null || identical(current, updated)) return;
+    _undoStack.add(current);
+    if (_undoStack.length > _historyLimit) {
+      _undoStack.removeAt(0);
+    }
+    _redoStack.clear();
+    _updateState(
+      state.copyWith(
+        pattern: updated,
+        clearSelection: clearSelection,
+        clearError: true,
+        canUndo: true,
+        canRedo: false,
+      ),
+    );
+  }
+
+  void _resetEditHistory() {
+    _undoStack.clear();
+    _redoStack.clear();
   }
 
   void _scheduleAutosave() {
@@ -449,6 +541,7 @@ class EditorController extends StateNotifier<EditorState> {
         () => ProjectCodec.decode(bytes, palettes: palettes),
       );
       if (!mounted) return;
+      _resetEditHistory();
       state = restored.copyWith(noticeMessage: '已自动恢复上次编辑', clearError: true);
     } catch (error) {
       if (!mounted) return;
