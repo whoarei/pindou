@@ -43,11 +43,13 @@ jobs:
           EOF
       - name: Build release APK
         run: flutter build apk --release
+      - name: Name Android package
+        run: mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/PindouStudio-${GITHUB_REF_NAME}-android.apk"
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: android-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: PindouStudio-android
+          path: build/app/outputs/flutter-apk/PindouStudio-*-android.apk
           if-no-files-found: error
 
   windows:
@@ -70,7 +72,8 @@ jobs:
         shell: pwsh
         run: |
           $releaseDir = Join-Path $env:GITHUB_WORKSPACE 'build/windows/x64/runner/Release'
-          $archive = Join-Path $env:GITHUB_WORKSPACE 'build/windows/bead-pattern-generator-windows-x64.zip'
+          $archiveName = "PindouStudio-$env:GITHUB_REF_NAME-windows-x64.zip"
+          $archive = Join-Path $env:GITHUB_WORKSPACE "build/windows/$archiveName"
           if (-not (Test-Path -LiteralPath $releaseDir)) {
             throw "Windows release directory was not found: $releaseDir"
           }
@@ -78,8 +81,8 @@ jobs:
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v7
         with:
-          name: windows-portable
-          path: build/windows/bead-pattern-generator-windows-x64.zip
+          name: PindouStudio-windows-x64
+          path: build/windows/PindouStudio-*-windows-x64.zip
           if-no-files-found: error
 
   release:
@@ -100,6 +103,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            release-assets/app-release.apk
-            release-assets/bead-pattern-generator-windows-x64.zip
+            release-assets/PindouStudio-*-android.apk
+            release-assets/PindouStudio-*-windows-x64.zip
           generate_release_notes: true
+          name: 拼豆工坊 ${{ github.ref_name }}

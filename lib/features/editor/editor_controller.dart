@@ -21,9 +21,7 @@ class EditorController extends StateNotifier<EditorState> {
   EditorController(this._paletteService) : super(const EditorState());
 
   final PaletteService _paletteService;
-  static const _filesChannel = MethodChannel(
-    'com.pindou.bead_pattern_generator/files',
-  );
+  static const _filesChannel = MethodChannel('com.pindou.studio/files');
 
   Future<void> initialize() async {
     try {

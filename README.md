@@ -1,4 +1,4 @@
-# 拼豆工坊（Bead Pattern Studio）
+# 拼豆工坊（Pindou Studio）
 
 一款基于 Flutter 的跨平台拼豆图生成应用，当前适配 Android 与 Windows。
 
@@ -71,4 +71,9 @@ E:\Android\flutter\bin\flutter.bat build apk --release
 - 推送 `v` 开头的标签，例如 `git tag v1.0.0 && git push origin v1.0.0`。构建完成后会自动创建 GitHub Release，并附加 Android APK 和 Windows x64 便携 ZIP。
 - 在 GitHub 的 Actions 页面手动运行 **Build releases**。手动运行不会创建 Release，APK 和 Windows ZIP 可从该次运行的 Artifacts 下载。
 
-Windows 产物是包含 DLL 和 `data` 目录的便携压缩包，解压后运行其中的 `bead_pattern_generator.exe`。
+标签 `v1.0.0` 对应的发布文件名为：
+
+- Android：`PindouStudio-v1.0.0-android.apk`
+- Windows：`PindouStudio-v1.0.0-windows-x64.zip`
+
+Windows 产物是包含 DLL 和 `data` 目录的便携压缩包，解压后运行其中的 `PindouStudio.exe`。

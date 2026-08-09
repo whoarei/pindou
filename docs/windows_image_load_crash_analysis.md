@@ -4,7 +4,7 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 应用 | 拼豆工坊（Bead Pattern Studio） |
+| 应用 | 拼豆工坊（Pindou Studio） |
 | 问题平台 | Windows x64 |
 | 问题日期 | 2026-08-09 |
 | Flutter | 3.44.9 stable |

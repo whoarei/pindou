@@ -4,7 +4,7 @@
 
 ## 1.1 项目名称
 
-Bead Pattern Generator
+拼豆工坊（Pindou Studio）
 
 ## 1.2 项目目标
 

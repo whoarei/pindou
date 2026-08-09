@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 
-import 'package:bead_pattern_generator/engine/bead_engine.dart';
-import 'package:bead_pattern_generator/engine/color_math.dart';
-import 'package:bead_pattern_generator/models/bead_color.dart';
-import 'package:bead_pattern_generator/models/crop_spec.dart';
+import 'package:pindou_studio/engine/bead_engine.dart';
+import 'package:pindou_studio/engine/color_math.dart';
+import 'package:pindou_studio/models/bead_color.dart';
+import 'package:pindou_studio/models/crop_spec.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 

@@ -1,5 +1,5 @@
-name: bead_pattern_generator
-description: "A cross-platform bead pattern generator for Android and Windows."
+name: pindou_studio
+description: "Pindou Studio, a cross-platform pixel bead pattern maker for Android and Windows."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

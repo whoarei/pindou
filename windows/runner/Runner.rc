@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.pindou" "\0"
-            VALUE "FileDescription", "Bead Pattern Studio" "\0"
+            VALUE "FileDescription", "Pindou Studio" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "bead_pattern_generator" "\0"
+            VALUE "InternalName", "PindouStudio" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.pindou. All rights reserved." "\0"
-            VALUE "OriginalFilename", "bead_pattern_generator.exe" "\0"
-            VALUE "ProductName", "Bead Pattern Studio" "\0"
+            VALUE "OriginalFilename", "PindouStudio.exe" "\0"
+            VALUE "ProductName", "Pindou Studio" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

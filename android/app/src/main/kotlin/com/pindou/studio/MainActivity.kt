@@ -1,4 +1,4 @@
-package com.pindou.bead_pattern_generator
+package com.pindou.studio
 
 import android.app.Activity
 import android.content.Intent
@@ -9,7 +9,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     companion object {
-        private const val FILES_CHANNEL = "com.pindou.bead_pattern_generator/files"
+        private const val FILES_CHANNEL = "com.pindou.studio/files"
         private const val PICK_IMAGE_REQUEST = 9020
         private const val CREATE_JPEG_REQUEST = 9021
     }
