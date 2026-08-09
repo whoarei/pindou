@@ -1,7 +1,10 @@
 package top.mossmoss.pindoustudio
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.os.Build
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -29,12 +32,7 @@ class MainActivity : FlutterActivity() {
                             return@setMethodCallHandler
                         }
                         pendingPickResult = result
-                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "image/*"
-                            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/jpeg", "image/png"))
-                        }
-                        startActivityForResult(intent, PICK_IMAGE_REQUEST)
+                        launchImagePicker(result)
                     }
                     "saveJpeg" -> {
                         if (pendingExportResult != null) {
@@ -59,6 +57,37 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun launchImagePicker(result: MethodChannel.Result) {
+        val galleryIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Intent(MediaStore.ACTION_PICK_IMAGES).apply {
+                type = "image/*"
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
+                type = "image/*"
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+
+        try {
+            startActivityForResult(galleryIntent, PICK_IMAGE_REQUEST)
+        } catch (_: ActivityNotFoundException) {
+            val documentIntent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/jpeg", "image/png"))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            try {
+                startActivityForResult(documentIntent, PICK_IMAGE_REQUEST)
+            } catch (error: ActivityNotFoundException) {
+                pendingPickResult = null
+                result.error("PICK_UNAVAILABLE", "设备上没有可用的图库或图片选择器。", error.message)
+            }
+        }
     }
 
     @Deprecated("Deprecated in Android API")
