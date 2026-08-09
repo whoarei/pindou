@@ -39,6 +39,31 @@ E:\Android\flutter\bin\flutter.bat build windows --release
 
 Windows 文件对话框通过 Runner 原生 C++ 异步通道实现，不依赖 Flutter 插件或开发人员模式。
 
+## 本地配置 Android 签名
+
+正式签名 keystore 默认存放在：
+
+```text
+E:\Android\libb.keystore
+```
+
+如需在本地生成正式签名 APK，请创建 `android/key.properties`（该文件已加入 `.gitignore`）：
+
+```properties
+storePassword=你的 keystore 密码
+keyPassword=你的 key 密码
+keyAlias=pindou
+storeFile=E:/Android/libb.keystore
+```
+
+然后执行：
+
+```powershell
+E:\Android\flutter\bin\flutter.bat build apk --release
+```
+
+请勿将 `key.properties`、keystore 文件或密码提交到 Git 仓库。GitHub Actions 使用仓库 Secrets 自动恢复相同的签名配置。
+
 ## GitHub Actions 发布构建
 
 `.github/workflows/release.yml` 支持两种触发方式：
